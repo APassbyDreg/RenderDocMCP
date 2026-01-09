@@ -246,6 +246,37 @@ def get_pipeline_state(event_id: int) -> dict:
     return bridge.call("get_pipeline_state", {"event_id": event_id})
 
 
+@mcp.tool
+def list_captures(directory: str) -> dict:
+    """
+    List all RenderDoc capture files (.rdc) in the specified directory.
+
+    Args:
+        directory: The directory path to search for capture files
+
+    Returns a list of capture files with their metadata including:
+    - filename: The capture file name
+    - path: Full path to the file
+    - size_bytes: File size in bytes
+    - modified_time: Last modified timestamp (ISO format)
+    """
+    return bridge.call("list_captures", {"directory": directory})
+
+
+@mcp.tool
+def open_capture(capture_path: str) -> dict:
+    """
+    Open a RenderDoc capture file (.rdc).
+
+    Args:
+        capture_path: Full path to the capture file to open
+
+    Returns success status and information about the opened capture.
+    Note: This will close any currently open capture.
+    """
+    return bridge.call("open_capture", {"capture_path": capture_path})
+
+
 def main():
     """Run the MCP server"""
     mcp.run()

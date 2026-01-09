@@ -41,6 +41,8 @@ RenderDocMCP/
 
 | ツール名 | 説明 |
 |---------|------|
+| `list_captures` | 指定ディレクトリ内の.rdcファイル一覧を取得 |
+| `open_capture` | キャプチャファイルを開く（既存キャプチャは自動で閉じる） |
 | `get_capture_status` | キャプチャ読込状態確認 |
 | `get_draw_calls` | ドローコール一覧（階層構造、フィルタリング対応） |
 | `get_frame_summary` | フレーム全体の統計情報（ドローコール数、マーカー一覧等） |
@@ -66,6 +68,18 @@ get_draw_calls(
     only_actions=True,          # マーカーを除外（ドローコールのみ）
     flags_filter=["Drawcall", "Dispatch"],  # 特定フラグのみ
 )
+```
+
+### キャプチャ管理ツール
+
+```python
+# ディレクトリ内のキャプチャファイルを列挙
+list_captures(directory="D:\\captures")
+# → {"count": 3, "captures": [{"filename": "game.rdc", "path": "...", "size_bytes": 12345, "modified_time": "..."}, ...]}
+
+# キャプチャファイルを開く（既存キャプチャは自動で閉じられる）
+open_capture(capture_path="D:\\captures\\game.rdc")
+# → {"success": true, "filename": "game.rdc", "api": "D3D11"}
 ```
 
 ### 逆引き検索ツール

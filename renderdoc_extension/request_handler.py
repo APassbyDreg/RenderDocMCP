@@ -25,6 +25,8 @@ class RequestHandler:
             "get_texture_info": self._handle_get_texture_info,
             "get_texture_data": self._handle_get_texture_data,
             "get_pipeline_state": self._handle_get_pipeline_state,
+            "list_captures": self._handle_list_captures,
+            "open_capture": self._handle_open_capture,
         }
 
     def handle(self, request):
@@ -155,3 +157,17 @@ class RequestHandler:
         if event_id is None:
             raise ValueError("event_id is required")
         return self.facade.get_pipeline_state(int(event_id))
+
+    def _handle_list_captures(self, params):
+        """Handle list_captures request"""
+        directory = params.get("directory")
+        if directory is None:
+            raise ValueError("directory is required")
+        return self.facade.list_captures(directory)
+
+    def _handle_open_capture(self, params):
+        """Handle open_capture request"""
+        capture_path = params.get("capture_path")
+        if capture_path is None:
+            raise ValueError("capture_path is required")
+        return self.facade.open_capture(capture_path)
