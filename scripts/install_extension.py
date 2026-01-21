@@ -44,9 +44,14 @@ def install():
         print("Removing existing installation at %s" % dest)
         shutil.rmtree(dest)
 
-    # Copy extension
-    shutil.copytree(extension_src, dest)
+    # Copy extension (excluding __pycache__)
+    shutil.copytree(
+        extension_src,
+        dest,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+    )
     print("Extension installed to %s" % dest)
+    print("  (__pycache__ directories excluded)")
     print("")
     print("Please restart RenderDoc and enable the extension in:")
     print("  Tools > Manage Extensions > RenderDoc MCP Bridge")

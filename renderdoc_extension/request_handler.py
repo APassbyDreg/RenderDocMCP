@@ -20,6 +20,7 @@ class RequestHandler:
             "find_draws_by_texture": self._handle_find_draws_by_texture,
             "find_draws_by_resource": self._handle_find_draws_by_resource,
             "get_draw_call_details": self._handle_get_draw_call_details,
+            "get_action_timings": self._handle_get_action_timings,
             "get_shader_info": self._handle_get_shader_info,
             "get_buffer_contents": self._handle_get_buffer_contents,
             "get_texture_info": self._handle_get_texture_info,
@@ -113,6 +114,17 @@ class RequestHandler:
         if event_id is None:
             raise ValueError("event_id is required")
         return self.facade.get_draw_call_details(int(event_id))
+
+    def _handle_get_action_timings(self, params):
+        """Handle get_action_timings request"""
+        event_ids = params.get("event_ids")
+        marker_filter = params.get("marker_filter")
+        exclude_markers = params.get("exclude_markers")
+        return self.facade.get_action_timings(
+            event_ids=event_ids,
+            marker_filter=marker_filter,
+            exclude_markers=exclude_markers,
+        )
 
     def _handle_get_shader_info(self, params):
         """Handle get_shader_info request"""

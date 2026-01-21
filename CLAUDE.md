@@ -50,6 +50,7 @@ RenderDocMCP/
 | `find_draws_by_texture` | Reverse search draw calls by texture name |
 | `find_draws_by_resource` | Reverse search draw calls by resource ID |
 | `get_draw_call_details` | Get specific draw call details |
+| `get_action_timings` | Get GPU execution time for actions |
 | `get_shader_info` | Get shader source/constant buffers |
 | `get_buffer_contents` | Get buffer data (offset/length can be specified) |
 | `get_texture_info` | Get texture metadata |
@@ -94,6 +95,23 @@ find_draws_by_texture(texture_name="CharacterSkin")
 # Search by resource ID (exact match)
 find_draws_by_resource(resource_id="ResourceId::12345")
 ```
+
+### GPU Timing Acquisition
+
+```python
+# Get timing for all actions
+get_action_timings()
+# → {"available": true, "unit": "CounterUnit.Seconds", "timings": [...], "total_duration_ms": 12.5, "count": 150}
+
+# Get timing for specific event IDs
+get_action_timings(event_ids=[100, 200, 300])
+
+# Filter by marker
+get_action_timings(marker_filter="Camera.Render", exclude_markers=["GUI.Repaint"])
+```
+
+**Note**: GPU timing counters may not be available depending on hardware/driver.
+If `available: false` is returned, timing information cannot be retrieved for that capture.
 
 ## Communication Protocol
 

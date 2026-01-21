@@ -146,6 +146,40 @@ def get_draw_call_details(event_id: int) -> dict:
 
 
 @mcp.tool
+def get_action_timings(
+    event_ids: list[int] | None = None,
+    marker_filter: str | None = None,
+    exclude_markers: list[str] | None = None,
+) -> dict:
+    """
+    Get GPU timing information for actions (draw calls, dispatches, etc.).
+
+    Args:
+        event_ids: Optional list of specific event IDs to get timings for.
+                   If not specified, returns timings for all actions.
+        marker_filter: Only include actions under markers containing this string (partial match).
+        exclude_markers: Exclude actions under markers containing these strings.
+
+    Returns timing data including:
+    - available: Whether GPU timing counters are supported
+    - unit: Time unit (typically "seconds")
+    - timings: List of {event_id, name, duration_seconds, duration_ms}
+    - total_duration_ms: Sum of all durations
+    - count: Number of timing entries
+
+    Note: GPU timing counters may not be available on all hardware/drivers.
+    """
+    params: dict[str, object] = {}
+    if event_ids is not None:
+        params["event_ids"] = event_ids
+    if marker_filter is not None:
+        params["marker_filter"] = marker_filter
+    if exclude_markers is not None:
+        params["exclude_markers"] = exclude_markers
+    return bridge.call("get_action_timings", params)
+
+
+@mcp.tool
 def get_shader_info(
     event_id: int,
     stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"],
