@@ -1,10 +1,10 @@
 # RenderDoc MCP Server
 
-**[日本語]** | [English](README.en.md)
+[日本語](README.jp.md) | **[English]**
 
-RenderDoc UI拡張機能として動作するMCPサーバー。AIアシスタントがRenderDocのキャプチャデータにアクセスし、グラフィックスデバッグを支援する。
+An MCP server that runs as a RenderDoc UI extension, enabling AI assistants to access RenderDoc capture data and assist with graphics debugging.
 
-## アーキテクチャ
+## Architecture
 
 ```
 Claude/AI Client (stdio)
@@ -16,41 +16,41 @@ MCP Server Process (Python + FastMCP 2.0)
 RenderDoc Process (Extension)
 ```
 
-RenderDoc内蔵のPythonにはsocketモジュールがないため、ファイルベースのIPCで通信を行う。
+Communication is done via file-based IPC since RenderDoc's embedded Python doesn't have the socket module.
 
-## セットアップ
+## Setup
 
-### 1. RenderDoc拡張機能のインストール
+### 1. Install RenderDoc Extension
 
 ```bash
 python scripts/install_extension.py
 ```
 
-拡張機能は `%APPDATA%\qrenderdoc\extensions\renderdoc_mcp_bridge` にインストールされる。
+The extension will be installed to `%APPDATA%\qrenderdoc\extensions\renderdoc_mcp_bridge`.
 
-### 2. RenderDocで拡張機能を有効化
+### 2. Enable Extension in RenderDoc
 
-1. RenderDocを起動
+1. Launch RenderDoc
 2. Tools > Manage Extensions
-3. "RenderDoc MCP Bridge" を有効化
+3. Enable "RenderDoc MCP Bridge"
 
-### 3. MCPサーバーのインストール
+### 3. Install MCP Server
 
 ```bash
-uv tool install
-uv tool update-shell  # PATHに追加
+uv tool install .
+uv tool update-shell  # Add to PATH
 ```
 
-シェルを再起動すると `renderdoc-mcp` コマンドが使えるようになる。
+After restarting your shell, the `renderdoc-mcp` command will be available.
 
-> **Note**: `--editable` を付けると、ソースコードの変更が即座に反映される（開発時に便利）。
-> 安定版としてインストールする場合は `uv tool install .` を使用。
+> **Note**: Use `--editable` flag for development to apply source code changes immediately.
+> For stable installation, use `uv tool install .`.
 
-### 4. MCPクライアントの設定
+### 4. Configure MCP Client
 
 #### Claude Desktop
 
-`claude_desktop_config.json` に追加:
+Add to `claude_desktop_config.json`:
 
 ```json
 {
@@ -62,9 +62,9 @@ uv tool update-shell  # PATHに追加
 }
 ```
 
-#### Claude Code
+#### Claude Code (Cursor)
 
-`.mcp.json` に追加:
+Add to `.mcp.json`:
 
 ```json
 {
@@ -76,79 +76,85 @@ uv tool update-shell  # PATHに追加
 }
 ```
 
-## 使い方
+## Usage
 
-1. RenderDocを起動し、キャプチャファイル (.rdc) を開く
-2. MCPクライアント (Claude等) から RenderDoc のデータにアクセス
+1. Launch RenderDoc and open a capture file (.rdc)
+2. Access RenderDoc data from MCP clients (Claude, etc.)
 
-## MCPツール一覧
+## MCP Tools
 
-| ツール | 説明 |
-|--------|------|
-| `get_capture_status` | キャプチャの読み込み状態を確認 |
-| `get_draw_calls` | ドローコール一覧を階層構造で取得 |
-| `get_draw_call_details` | 特定のドローコールの詳細情報を取得 |
-| `get_shader_info` | シェーダーのソースコード・定数バッファの値を取得 |
-| `get_buffer_contents` | バッファの内容を取得 (Base64) |
-| `get_texture_info` | テクスチャのメタデータを取得 |
-| `get_texture_data` | テクスチャのピクセルデータを取得 (Base64) |
-| `get_pipeline_state` | パイプライン状態を取得 |
+| Tool                     | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `get_capture_status`     | Check capture load status                                |
+| `get_draw_calls`         | Get draw call list in hierarchical structure             |
+| `get_frame_summary`      | Get frame statistics and top-level markers               |
+| `find_draws_by_shader`   | Find draw calls using specific shader (partial match)    |
+| `find_draws_by_texture`  | Find draw calls using specific texture (partial match)   |
+| `find_draws_by_resource` | Find draw calls using specific resource ID (exact match) |
+| `get_draw_call_details`  | Get detailed information about a specific draw call      |
+| `get_shader_info`        | Get shader source code and constant buffer values        |
+| `get_buffer_contents`    | Get buffer contents (Base64)                             |
+| `get_texture_info`       | Get texture metadata                                     |
+| `get_texture_data`       | Get texture pixel data (Base64)                          |
+| `get_pipeline_state`     | Get pipeline state                                       |
+| `list_captures`          | List all .rdc files in directory                         |
+| `open_capture`           | Open a capture file                                      |
 
-## 使用例
+## Examples
 
-### ドローコール一覧の取得
+### Get Draw Call List
 
 ```
 get_draw_calls(include_children=true)
 ```
 
-### シェーダー情報の取得
+### Get Shader Information
 
 ```
 get_shader_info(event_id=123, stage="pixel")
 ```
 
-### パイプライン状態の取得
+### Get Pipeline State
 
 ```
 get_pipeline_state(event_id=123)
 ```
 
-### テクスチャデータの取得
+### Get Texture Data
 
 ```
-# 2Dテクスチャのmip 0を取得
+# Get mip 0 of 2D texture
 get_texture_data(resource_id="ResourceId::123")
 
-# 特定のmipレベルを取得
+# Get specific mip level
 get_texture_data(resource_id="ResourceId::123", mip=2)
 
-# キューブマップの特定の面を取得 (0=X+, 1=X-, 2=Y+, 3=Y-, 4=Z+, 5=Z-)
+# Get specific cube map face (0=X+, 1=X-, 2=Y+, 3=Y-, 4=Z+, 5=Z-)
 get_texture_data(resource_id="ResourceId::456", slice=3)
 
-# 3Dテクスチャの特定の深度スライスを取得
+# Get specific depth slice of 3D texture
 get_texture_data(resource_id="ResourceId::789", depth_slice=5)
 ```
 
-### バッファデータの部分取得
+### Get Partial Buffer Data
 
 ```
-# バッファ全体を取得
+# Get entire buffer
 get_buffer_contents(resource_id="ResourceId::123")
 
-# オフセット256から512バイト取得
+# Get 512 bytes from offset 256
 get_buffer_contents(resource_id="ResourceId::123", offset=256, length=512)
 ```
 
-## 要件
+## Requirements
 
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/)
 - RenderDoc 1.20+
 
-> **Note**: 動作確認はWindows + DirectX 11環境でのみ行っています。
-> Linux/macOS + Vulkan/OpenGL環境でも動作する可能性がありますが、未検証です。
+> **Note**: Tested only on Windows + DirectX 11.
+> May work on Linux/macOS + Vulkan/OpenGL but untested.
 
-## ライセンス
+## License
 
 MIT
