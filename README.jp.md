@@ -37,7 +37,7 @@ python scripts/install_extension.py
 ### 3. MCPサーバーのインストール
 
 ```bash
-uv tool install
+uv tool install .
 uv tool update-shell  # PATHに追加
 ```
 
