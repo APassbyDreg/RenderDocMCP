@@ -16,6 +16,7 @@ IPC_DIR = os.path.join(tempfile.gettempdir(), "renderdoc_mcp")
 REQUEST_FILE = os.path.join(IPC_DIR, "request.json")
 RESPONSE_FILE = os.path.join(IPC_DIR, "response.json")
 LOCK_FILE = os.path.join(IPC_DIR, "lock")
+RESPONSE_LOCK_FILE = os.path.join(IPC_DIR, "response.lock")
 
 
 class MCPBridgeServer(QObject):
@@ -62,7 +63,7 @@ class MCPBridgeServer(QObject):
 
     def _cleanup_files(self):
         """Remove IPC files"""
-        for f in [REQUEST_FILE, RESPONSE_FILE, LOCK_FILE]:
+        for f in [REQUEST_FILE, RESPONSE_FILE, LOCK_FILE, RESPONSE_LOCK_FILE]:
             try:
                 if os.path.exists(f):
                     os.remove(f)
@@ -100,9 +101,18 @@ class MCPBridgeServer(QObject):
                     "error": {"code": -32603, "message": str(e)}
                 }
 
+            # Create response lock file to signal we're writing
+            with open(RESPONSE_LOCK_FILE, "w") as lf:
+                lf.write("lock")
+
             # Write response
-            with open(RESPONSE_FILE, "w", encoding="utf-8") as f:
-                json.dump(response, f)
+            try:
+                with open(RESPONSE_FILE, "w", encoding="utf-8") as f:
+                    json.dump(response, f)
+            finally:
+                # Remove response lock file to signal write complete
+                if os.path.exists(RESPONSE_LOCK_FILE):
+                    os.remove(RESPONSE_LOCK_FILE)
 
         except Exception as e:
             print("[MCP Bridge] Error processing request: %s" % str(e))

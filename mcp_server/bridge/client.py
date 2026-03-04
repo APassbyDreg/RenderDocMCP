@@ -15,7 +15,8 @@ from typing import Any
 IPC_DIR = os.path.join(tempfile.gettempdir(), "renderdoc_mcp")
 REQUEST_FILE = os.path.join(IPC_DIR, "request.json")
 RESPONSE_FILE = os.path.join(IPC_DIR, "response.json")
-LOCK_FILE = os.path.join(IPC_DIR, "lock")
+REQUEST_LOCK_FILE = os.path.join(IPC_DIR, "lock")
+RESPONSE_LOCK_FILE = os.path.join(IPC_DIR, "response.lock")
 
 
 class RenderDocBridgeError(Exception):
@@ -54,7 +55,7 @@ class RenderDocBridge:
                 os.remove(RESPONSE_FILE)
 
             # Create lock file to signal we're writing
-            with open(LOCK_FILE, "w") as f:
+            with open(REQUEST_LOCK_FILE, "w") as f:
                 f.write("lock")
 
             # Write request
@@ -62,14 +63,16 @@ class RenderDocBridge:
                 json.dump(request, f)
 
             # Remove lock file to signal write complete
-            os.remove(LOCK_FILE)
+            os.remove(REQUEST_LOCK_FILE)
 
             # Wait for response
             start_time = time.time()
             while True:
                 if os.path.exists(RESPONSE_FILE):
-                    # Small delay to ensure file is fully written
-                    time.sleep(0.01)
+                    # Wait until response lock file is removed (RDC finished writing)
+                    if os.path.exists(RESPONSE_LOCK_FILE):
+                        time.sleep(0.05)
+                        continue
 
                     # Read response
                     with open(RESPONSE_FILE, "r", encoding="utf-8") as f:
