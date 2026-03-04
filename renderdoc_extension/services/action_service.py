@@ -4,7 +4,7 @@ Draw call / action operations service for RenderDoc.
 
 import renderdoc as rd
 
-from ..utils import Serializers, Helpers
+from ..utils import Serializers, Helpers, logger
 
 
 class ActionService:
@@ -141,6 +141,8 @@ class ActionService:
             controller.SetFrameEvent(event_id, True)
 
             action = self.ctx.GetAction(event_id)
+            pipeline_state = controller.GetPipelineState()
+
             if not action:
                 result["error"] = "No action at event %d" % event_id
                 return
@@ -148,27 +150,62 @@ class ActionService:
             structured_file = controller.GetStructuredFile()
 
             details = {
-                "event_id": action.eventId,
-                "action_id": action.actionId,
                 "name": action.GetName(structured_file),
                 "flags": Serializers.serialize_flags(action.flags),
-                "num_indices": action.numIndices,
-                "num_instances": action.numInstances,
-                "base_vertex": action.baseVertex,
-                "vertex_offset": action.vertexOffset,
-                "instance_offset": action.instanceOffset,
-                "index_offset": action.indexOffset,
             }
 
-            # Output resources
-            outputs = []
-            for i, output in enumerate(action.outputs):
-                if output != rd.ResourceId.Null():
-                    outputs.append({"index": i, "resource_id": str(output)})
-            details["outputs"] = outputs
+            try:
 
-            if action.depthOut != rd.ResourceId.Null():
-                details["depth_output"] = str(action.depthOut)
+                if action.flags & rd.ActionFlags.Drawcall:
+                    details["num_indices"] = action.numIndices
+                    details["num_instances"] = action.numInstances
+                    details["base_vertex"] = action.baseVertex
+                    details["vertex_offset"] = action.vertexOffset
+                    details["instance_offset"] = action.instanceOffset
+                    details["index_offset"] = action.indexOffset
+                    # Output resources
+                    outputs = []
+                    for i, output in enumerate(action.outputs):
+                        if output != rd.ResourceId.Null():
+                            outputs.append(
+                                {"index": i, "resource_id": str(output)})
+                    if outputs:
+                        details["outputs"] = outputs
+                    if action.depthOut != rd.ResourceId.Null():
+                        details["depth_output"] = str(action.depthOut)
+                    # Shaders
+                    vs_data = self.get_shader_brief(
+                        pipeline_state, rd.ShaderStage.Vertex)
+                    if vs_data:
+                        details["vertex_shader"] = vs_data
+                    ps_data = self.get_shader_brief(
+                        pipeline_state, rd.ShaderStage.Pixel)
+                    if ps_data:
+                        details["pixel_shader"] = ps_data
+
+                if action.flags & rd.ActionFlags.Dispatch:
+                    details["dispatchDimension"] = action.dispatchDimension
+                    details["dispatchThreadDimension"] = action.dispatchThreadsDimension
+                    cs_data = self.get_shader_brief(
+                        pipeline_state, rd.ShaderStage.Compute)
+                    if cs_data:
+                        details["compute_shader"] = cs_data
+
+                if action.flags & rd.ActionFlags.Copy:
+                    details["copySource"] = f"resource ID={str(action.copySource)}"
+                    details["copySourceSubresource"] = {
+                        "mip": action.copySourceSubresource.mip,
+                        "slice": action.copySourceSubresource.slice,
+                        "sample": action.copySourceSubresource.sample,
+                    }
+                    details["copyDestination"] = f"resource ID={str(action.copyDestination)}"
+                    details["copyDestinationSubresource"] = {
+                        "mip": action.copyDestinationSubresource.mip,
+                        "slice": action.copyDestinationSubresource.slice,
+                        "sample": action.copyDestinationSubresource.sample,
+                    }
+            except Exception as e:
+                logger.error(f"Error getting action details: {e}")
 
             result["details"] = details
 
@@ -317,3 +354,22 @@ class ActionService:
             return result
             # raise ValueError(result["error"])
         return result["data"]
+
+    def get_shader_brief(self, pipe, stage_enum):
+        shader = pipe.GetShader(stage_enum)
+        refl = pipe.GetShaderReflection(stage_enum)
+        if refl is None:
+            return {}
+
+        if refl.debugInfo.sourceDebugInformation:
+            return {
+                "resource_id": str(shader),
+                "entrySourceFile": refl.debugInfo.files[0].filename,
+                "entrySourceName": refl.debugInfo.entrySourceName,
+            }
+        else:
+            return {
+                "resource_id": str(shader),
+                "resource_name": self.ctx.GetResourceName(shader) or "",
+                "debugStatus": "No source available, can only use disassembly"
+            }

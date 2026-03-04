@@ -2,7 +2,57 @@
 Serialization utility functions for RenderDoc data types.
 """
 
+from . import logger
+
 import renderdoc as rd
+
+
+def shader_var_to_value(var):
+    # recursive for (struct / array)
+    if len(var.members) > 0:
+        # array
+        if var.members[0].name.startswith('['):
+            return [shader_var_to_value(m) for m in var.members]
+        # struct
+        return {m.name: shader_var_to_value(m) for m in var.members}
+
+    t = var.type
+    rows, cols = var.rows, var.columns
+    total = rows * cols
+
+    if t in (rd.VarType.Float, rd.VarType.Half):
+        raw = [var.value.f32v[i] for i in range(total)]
+    elif t == rd.VarType.Double:
+        raw = [var.value.f64v[i] for i in range(total)]
+    elif t in (rd.VarType.SInt, rd.VarType.SShort, rd.VarType.SByte):
+        raw = [var.value.s32v[i] for i in range(total)]
+    elif t in (rd.VarType.UInt, rd.VarType.UShort, rd.VarType.UByte,
+               rd.VarType.Bool, rd.VarType.Enum):
+        raw = [var.value.u32v[i] for i in range(total)]
+    elif t == rd.VarType.SLong:
+        raw = [var.value.s64v[i] for i in range(total)]
+    elif t == rd.VarType.ULong:
+        raw = [var.value.u64v[i] for i in range(total)]
+    else:
+        return None  # skip special types like GPUPointer
+
+    # bool
+    if t == rd.VarType.Bool:
+        raw = [bool(v) for v in raw]
+
+    # scaler
+    if total == 1:
+        return raw[0]
+    # vector
+    if rows == 1:
+        return raw
+    # matrix
+    return [raw[r * cols:(r + 1) * cols] for r in range(rows)]
+
+
+def cbuffer_vars_to_dict(shader_vars):
+    """List[ShaderVariable] → dict"""
+    return {v.name: shader_var_to_value(v) for v in shader_vars}
 
 
 class Serializers:
@@ -236,3 +286,108 @@ class Serializers:
                 serialized.append(item)
 
         return serialized
+
+    @staticmethod
+    def serialize_descriptor(used, refl, full=False):
+        """
+        Serialize descriptor binding information to JSON-compatible format.
+        
+        Args:
+            used: UsedDescriptor object
+            refl: Shader reflection object
+            full: Whether to include full details or just basic info
+        """
+        acc = used.access
+        desc = used.descriptor
+        cat = rd.CategoryForDescriptorType(acc.type)
+
+        bind_name = ""
+        if refl is not None and acc.index != rd.DescriptorAccess.NoShaderBinding:
+            if cat == rd.DescriptorCategory.ReadOnlyResource:
+                if acc.index < len(refl.readOnlyResources):
+                    bind_name = refl.readOnlyResources[acc.index].name
+            elif cat == rd.DescriptorCategory.ReadWriteResource:
+                if acc.index < len(refl.readWriteResources):
+                    bind_name = refl.readWriteResources[acc.index].name
+
+        is_texture = acc.type == rd.DescriptorType.Image or acc.type == rd.DescriptorType.ReadWriteImage
+        is_buffer = acc.type == rd.DescriptorType.Buffer or acc.type == rd.DescriptorType.ReadWriteBuffer
+        is_typed_buffer = acc.type == rd.DescriptorType.TypedBuffer or acc.type == rd.DescriptorType.ReadWriteTypedBuffer
+
+        data = {
+            "shaderName":      bind_name,
+            "descriptorType":  str(acc.type),
+            "resource":        str(desc.resource),
+        }
+
+        # return only simplified info if full details not requested
+        if not full:
+            return data
+
+        data["shaderIndex"] = acc.index
+
+        if is_texture:
+            data.update({
+                "firstMip":        desc.firstMip,
+                "numMips":         desc.numMips,
+                "firstSlice":      desc.firstSlice,
+                "numSlices":       desc.numSlices,
+                "textureType":     str(desc.textureType),
+            })
+        if is_buffer or is_typed_buffer:
+            data.update({
+                "byteOffset":      desc.byteOffset,
+                "byteSize":        desc.byteSize,
+                "elementByteSize": desc.elementByteSize,
+            })
+        if is_typed_buffer or is_texture:
+            data["format"] = str(
+                desc.format.Name()) if desc.resource != rd.ResourceId.Null() else ""
+        return data
+
+    @staticmethod
+    def serialize_const_block(pipe, stage, refl, controller, cb_index, cb, full=False):
+        """
+        Serialize constant buffer contents to JSON-compatible format
+        
+        Args:
+            pipeline: Pipeline object
+            stage: Shader stage
+            controller: ReplayController object
+            cb_index: Index of the constant buffer
+            block: ConstantBufferData object containing buffer contents and variable info
+            full: Whether to include full details or just basic info
+        """
+        result = {
+            "byteSize": cb.byteSize,
+            "bufferBacked": cb.bufferBacked,
+        }
+        if not cb.bufferBacked or not full:
+            return result
+
+        used = pipe.GetConstantBlock(stage, cb_index, 0)
+        buf_id = used.descriptor.resource
+
+        entry = pipe.GetShaderEntryPoint(stage)
+        shader_id = refl.resourceId
+
+        try:
+            shader_vars = controller.GetCBufferVariableContents(
+                pipe.GetGraphicsPipelineObject(),       # pipeline object
+                shader_id,  # shader resource id
+                stage,      # shader stage
+                entry,      # entry point name
+                cb_index,   # constantBlocks index
+                used.descriptor.resource,     # GPU buffer id
+                0,          # byte offset
+                0,          # length（0 = read all）
+            )
+        except Exception as e:
+            logger.error(f"{e}")
+            logger.error(f"{type(e)}")
+            logger.error(
+                f"Shader ID: {shader_id}, Stage: {stage}, Entry: {entry}, CB Index: {cb_index}, Buffer ID: {buf_id}")
+            return result
+        cb_dict = cbuffer_vars_to_dict(shader_vars)
+        result["data"] = cb_dict
+        return result

@@ -12,6 +12,8 @@ from .services import (
     PipelineService,
 )
 
+from .utils import logger
+
 
 class RenderDocFacade:
     """
@@ -43,7 +45,10 @@ class RenderDocFacade:
 
     def _invoke(self, callback):
         """Invoke callback on replay thread via BlockInvoke"""
-        self.ctx.Replay().BlockInvoke(callback)
+        try:
+            self.ctx.Replay().BlockInvoke(callback)
+        except Exception as e:
+            logger.error(f"Replay thread invocation failed: {str(e)}")
 
     # ==================== Capture Management ====================
 
@@ -130,9 +135,9 @@ class RenderDocFacade:
 
     # ==================== Pipeline Operations ====================
 
-    def get_shader_info(self, event_id, stage):
+    def get_shader_info(self, event_id, stage, full=False):
         """Get shader information for a specific stage"""
-        return self._pipeline.get_shader_info(event_id, stage)
+        return self._pipeline.get_shader_info(event_id, stage, full)
 
     def get_pipeline_state(self, event_id):
         """Get full pipeline state at an event"""

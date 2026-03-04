@@ -51,7 +51,7 @@ RenderDocMCP/
 | `find_draws_by_resource` | Reverse search draw calls by resource ID |
 | `get_draw_call_details` | Get specific draw call details |
 | `get_action_timings` | Get GPU execution time for actions |
-| `get_shader_info` | Get shader source/constant buffers |
+| `get_shader_info` | Get shader source/constant buffers (full mode supported) |
 | `get_buffer_contents` | Get buffer data (offset/length can be specified) |
 | `get_texture_info` | Get texture metadata |
 | `get_texture_data` | Get texture pixel data (mip/slice/3D slice supported) |
@@ -67,6 +67,7 @@ get_draw_calls(
     event_id_min=7372,          # event_id range start
     event_id_max=7600,          # event_id range end
     only_actions=True,          # Exclude markers (draw calls only)
+    only_markers=False,         # Include markers (to get a summary of capture)
     flags_filter=["Drawcall", "Dispatch"],  # Specific flags only
 )
 ```

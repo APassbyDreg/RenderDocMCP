@@ -4,7 +4,7 @@ Pipeline state service for RenderDoc.
 
 import renderdoc as rd
 
-from ..utils import Parsers, Serializers, Helpers
+from ..utils import Parsers, Serializers, Helpers, logger
 
 
 class PipelineService:
@@ -14,7 +14,7 @@ class PipelineService:
         self.ctx = ctx
         self._invoke = invoke_fn
 
-    def get_shader_info(self, event_id, stage):
+    def get_shader_info(self, event_id, stage, full=False):
         """Get shader information for a specific stage"""
         if not self.ctx.IsCaptureLoaded():
             raise ValueError("No capture loaded")
@@ -35,29 +35,47 @@ class PipelineService:
             entry = pipe.GetShaderEntryPoint(stage_enum)
             reflection = pipe.GetShaderReflection(stage_enum)
 
+            if not reflection:
+                result["error"] = "No reflection available for %s shader" % stage
+                return
+
             shader_info = {
-                "resource_id": str(shader),
                 "entry_point": entry,
                 "stage": stage,
             }
 
-            # Get disassembly
-            try:
-                targets = controller.GetDisassemblyTargets(True)
-                if targets:
-                    disasm = controller.DisassembleShader(
-                        pipe.GetGraphicsPipelineObject(), reflection, targets[0]
-                    )
-                    shader_info["disassembly"] = disasm
-            except Exception as e:
-                shader_info["disassembly_error"] = str(e)
+            # debug info
+            debug_info = reflection.debugInfo
+            if not debug_info.sourceDebugInformation or len(debug_info.files) == 0:
+                try:
+                    targets = controller.GetDisassemblyTargets(True)
+                    if targets:
+                        disasm = controller.DisassembleShader(
+                            pipe.GetGraphicsPipelineObject(
+                            ), reflection, targets[0]
+                        )
+                        shader_info["disassembly"] = disasm
+                except Exception as e:
+                    shader_info["disassembly_error"] = str(e)
+            else:
+                shader_info["source_files"] = [
+                    file.filename for file in debug_info.files]
 
-            # Get constant buffer info
-            if reflection:
-                shader_info["constant_buffers"] = self._get_cbuffer_info(
-                    controller, pipe, reflection, stage_enum
-                )
-                shader_info["resources"] = self._get_resource_bindings(reflection)
+            # constant buffer info
+            try:
+                shader_info["constant_buffers"] = [Serializers.serialize_const_block(
+                    pipe, stage_enum, reflection, controller, i, cb, full) for i, cb in enumerate(reflection.constantBlocks)]
+            except Exception as e:
+                logger.error(f"Error getting constant buffers: {e}")
+
+            # resources (SRVs and UAVs)
+            try:
+                shader_info["srv"] = [Serializers.serialize_descriptor(
+                    res, reflection, full) for res in pipe.GetReadOnlyResources(stage_enum, True)]
+                shader_info["uav"] = [Serializers.serialize_descriptor(
+                    res, reflection, full) for res in pipe.GetReadWriteResources(stage_enum, True)]
+            except Exception as e:
+                logger.error(f"Error getting resources: {e}")
 
             result["shader"] = shader_info
 
@@ -398,35 +416,3 @@ class PipelineService:
             cbuffers.append(cb_info)
 
         return cbuffers
-
-    def _get_resource_bindings(self, reflection):
-        """Get shader resource bindings"""
-        resources = []
-
-        try:
-            for res in reflection.readOnlyResources:
-                resources.append(
-                    {
-                        "name": res.name,
-                        "type": str(res.resType),
-                        "binding": res.fixedBindNumber,
-                        "access": "ReadOnly",
-                    }
-                )
-        except Exception:
-            pass
-
-        try:
-            for res in reflection.readWriteResources:
-                resources.append(
-                    {
-                        "name": res.name,
-                        "type": str(res.resType),
-                        "binding": res.fixedBindNumber,
-                        "access": "ReadWrite",
-                    }
-                )
-        except Exception:
-            pass
-
-        return resources

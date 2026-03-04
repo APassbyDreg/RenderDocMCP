@@ -5,6 +5,7 @@ Routes incoming requests to appropriate facade methods.
 
 import traceback
 
+from .utils import logger
 
 class RequestHandler:
     """Handles incoming MCP bridge requests"""
@@ -36,6 +37,8 @@ class RequestHandler:
         method = request.get("method")
         params = request.get("params", {})
 
+        logger.info(f"Received request: {method} with params: {params}")
+
         try:
             if method not in self._methods:
                 return self._error_response(
@@ -43,6 +46,10 @@ class RequestHandler:
                 )
 
             result = self._methods[method](params)
+
+            logger.info(
+                f"Sending response for request {method}, keys={result.keys() if isinstance(result, dict) else 'N/A'}")
+
             return {"id": request_id, "result": result}
 
         except ValueError as e:
@@ -135,11 +142,12 @@ class RequestHandler:
         """Handle get_shader_info request"""
         event_id = params.get("event_id")
         stage = params.get("stage")
+        full = params.get("full", False)
         if event_id is None:
             raise ValueError("event_id is required")
         if stage is None:
             raise ValueError("stage is required")
-        return self.facade.get_shader_info(int(event_id), stage)
+        return self.facade.get_shader_info(int(event_id), stage, full)
 
     def _handle_get_buffer_contents(self, params):
         """Handle get_buffer_contents request"""

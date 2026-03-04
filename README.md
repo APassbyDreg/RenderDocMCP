@@ -92,7 +92,7 @@ Add to `.mcp.json`:
 | `find_draws_by_texture`  | Find draw calls using specific texture (partial match)   |
 | `find_draws_by_resource` | Find draw calls using specific resource ID (exact match) |
 | `get_draw_call_details`  | Get detailed information about a specific draw call      |
-| `get_shader_info`        | Get shader source code and constant buffer values        |
+| `get_shader_info`        | Get shader source code and constant buffer values (full mode supported) |
 | `get_buffer_contents`    | Get buffer contents (Base64)                             |
 | `get_texture_info`       | Get texture metadata                                     |
 | `get_texture_data`       | Get texture pixel data (Base64)                          |
@@ -111,7 +111,10 @@ get_draw_calls(include_children=true)
 ### Get Shader Information
 
 ```
-get_shader_info(event_id=123, stage="pixel")
+get_shader_info(event_id=123, stage="pixel", full=false)
+
+# Include full constant buffers and resource bindings
+get_shader_info(event_id=123, stage="pixel", full=true)
 ```
 
 ### Get Pipeline State

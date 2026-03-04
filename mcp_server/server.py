@@ -187,6 +187,7 @@ def get_action_timings(
 def get_shader_info(
     event_id: int,
     stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"],
+    full: bool = False,
 ) -> dict:
     """
     Get shader information for a specific stage at a given event.
@@ -194,10 +195,14 @@ def get_shader_info(
     Args:
         event_id: The event ID to inspect the shader at
         stage: The shader stage (vertex, hull, domain, geometry, pixel, compute)
+        full: Whether to return full constant buffer and resource binding details
 
     Returns shader disassembly, constant buffer values, and resource bindings.
     """
-    return bridge.call("get_shader_info", {"event_id": event_id, "stage": stage})
+    return bridge.call(
+        "get_shader_info",
+        {"event_id": event_id, "stage": stage, "full": full},
+    )
 
 
 @mcp.tool
