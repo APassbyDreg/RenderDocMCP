@@ -13,9 +13,10 @@ from typing import Any
 
 # IPC directory (must match renderdoc_extension/socket_server.py)
 IPC_DIR = os.path.join(tempfile.gettempdir(), "renderdoc_mcp")
+LOG_FILE = os.path.join(IPC_DIR, "client.log")
 REQUEST_FILE = os.path.join(IPC_DIR, "request.json")
 RESPONSE_FILE = os.path.join(IPC_DIR, "response.json")
-REQUEST_LOCK_FILE = os.path.join(IPC_DIR, "lock")
+REQUEST_LOCK_FILE = os.path.join(IPC_DIR, "request.lock")
 RESPONSE_LOCK_FILE = os.path.join(IPC_DIR, "response.lock")
 
 

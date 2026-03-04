@@ -13,9 +13,10 @@ from PySide2.QtCore import QObject, QTimer
 
 # IPC directory
 IPC_DIR = os.path.join(tempfile.gettempdir(), "renderdoc_mcp")
+LOG_FILE = os.path.join(IPC_DIR, "server.log")
 REQUEST_FILE = os.path.join(IPC_DIR, "request.json")
 RESPONSE_FILE = os.path.join(IPC_DIR, "response.json")
-LOCK_FILE = os.path.join(IPC_DIR, "lock")
+REQUEST_LOCK_FILE = os.path.join(IPC_DIR, "request.lock")
 RESPONSE_LOCK_FILE = os.path.join(IPC_DIR, "response.lock")
 
 
@@ -63,7 +64,7 @@ class MCPBridgeServer(QObject):
 
     def _cleanup_files(self):
         """Remove IPC files"""
-        for f in [REQUEST_FILE, RESPONSE_FILE, LOCK_FILE, RESPONSE_LOCK_FILE]:
+        for f in [REQUEST_FILE, RESPONSE_FILE, REQUEST_LOCK_FILE, RESPONSE_LOCK_FILE]:
             try:
                 if os.path.exists(f):
                     os.remove(f)
@@ -80,7 +81,7 @@ class MCPBridgeServer(QObject):
             return
 
         # Check if lock file exists (client is still writing)
-        if os.path.exists(LOCK_FILE):
+        if os.path.exists(REQUEST_LOCK_FILE):
             return
 
         try:
