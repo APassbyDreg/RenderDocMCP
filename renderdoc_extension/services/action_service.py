@@ -173,7 +173,8 @@ class ActionService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["details"]
 
     def get_action_timings(
@@ -311,5 +312,6 @@ class ActionService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["data"]

@@ -4,7 +4,9 @@ Reverse lookup search service for RenderDoc.
 
 import renderdoc as rd
 
-from ..utils import Parsers, Helpers
+import time
+
+from ..utils import Parsers, Helpers, logger
 
 
 class SearchService:
@@ -24,6 +26,9 @@ class SearchService:
         if not self.ctx.IsCaptureLoaded():
             raise ValueError("No capture loaded")
 
+        raise RuntimeError(
+            "_search_draws is deprecated and should not be used. Use ActionService.find_draws_by_texture/resource instead.")
+
         result = {"matches": [], "scanned_draws": 0}
 
         def callback(controller):
@@ -38,9 +43,15 @@ class SearchService:
             ]
             result["scanned_draws"] = len(draw_actions)
 
-            for action in draw_actions:
+            logger.info("Searching %d draw calls..." % len(draw_actions))
+            t_start = time.time()
+
+            for i, action in enumerate(draw_actions):
                 controller.SetFrameEvent(action.eventId, False)
                 pipe = controller.GetPipelineState()
+
+                logger.debug(
+                    f"- Checking event {action.eventId} ({i + 1}/{len(draw_actions)}): {action.GetName(structured_file)}")
 
                 match_reason = matcher_fn(pipe, controller, action, self.ctx)
                 if match_reason:
@@ -50,9 +61,47 @@ class SearchService:
                         "match_reason": match_reason,
                     })
 
+            logger.info("Search completed in %.2f seconds. Found %d matches out of %d draw calls." % (
+                time.time() -
+                t_start, len(result["matches"]), result["scanned_draws"]
+            ))
+
         self._invoke(callback)
         result["total_matches"] = len(result["matches"])
         return result
+
+    def _format_resource_usage(self, usage, ctx):
+        """Format resource usage into a readable reason string."""
+        usage_enum = usage.usage
+        reason = None
+
+        for stage in Helpers.get_all_shader_stages():
+            if usage_enum == rd.ResUsage(stage):
+                reason = "%s SRV" % str(stage)
+                break
+            if usage_enum == rd.RWResUsage(stage):
+                reason = "%s UAV" % str(stage)
+                break
+            if usage_enum == rd.CBUsage(stage):
+                reason = "%s ConstantBuffer" % str(stage)
+                break
+
+        if reason is None:
+            usage_label = str(usage_enum)
+            if usage_label.startswith("ResourceUsage."):
+                usage_label = usage_label.split(".", 1)[1]
+            reason = usage_label
+
+        if usage.view != rd.ResourceId.Null():
+            view_name = ""
+            try:
+                view_name = ctx.GetResourceName(usage.view)
+            except Exception:
+                pass
+            if view_name:
+                reason = "%s (view: %s)" % (reason, view_name)
+
+        return reason
 
     def find_draws_by_shader(self, shader_name, stage=None):
         """Find all draw calls using a shader with the given name (partial match)."""
@@ -87,104 +136,122 @@ class SearchService:
 
     def find_draws_by_texture(self, texture_name):
         """Find all draw calls using a texture with the given name (partial match)."""
-        stages_to_check = Helpers.get_all_shader_stages()
+        if not self.ctx.IsCaptureLoaded():
+            raise ValueError("No capture loaded")
 
-        def matcher(pipe, controller, action, ctx):
-            # Check SRVs (read-only resources)
-            for stage in stages_to_check:
+        result = {"matches": [], "scanned_draws": 0}
+        texture_name_lower = texture_name.lower()
+
+        def callback(controller):
+            structured_file = controller.GetStructuredFile()
+            matching_textures = []
+
+            for tex in controller.GetTextures():
+                res_name = ""
                 try:
-                    srvs = pipe.GetReadOnlyResources(stage, False)
-                    for srv in srvs:
-                        if srv.descriptor.resource == rd.ResourceId.Null():
-                            continue
-                        res_name = ""
-                        try:
-                            res_name = ctx.GetResourceName(srv.descriptor.resource)
-                        except Exception:
-                            pass
-                        if res_name and texture_name.lower() in res_name.lower():
-                            return "%s SRV: '%s'" % (str(stage), res_name)
+                    res_name = self.ctx.GetResourceName(tex.resourceId)
                 except Exception:
                     pass
+                if res_name and texture_name_lower in res_name.lower():
+                    matching_textures.append((tex.resourceId, res_name))
 
-                # Check UAVs (read-write resources)
-                try:
-                    uavs = pipe.GetReadWriteResources(stage, False)
-                    for uav in uavs:
-                        if uav.descriptor.resource == rd.ResourceId.Null():
-                            continue
-                        res_name = ""
-                        try:
-                            res_name = ctx.GetResourceName(uav.descriptor.resource)
-                        except Exception:
-                            pass
-                        if res_name and texture_name.lower() in res_name.lower():
-                            return "%s UAV: '%s'" % (str(stage), res_name)
-                except Exception:
-                    pass
+            matches_by_event = {}
+            for resource_id, res_name in matching_textures:
+                for usage in controller.GetUsage(resource_id):
+                    if usage.eventId == 0:
+                        continue
 
-            # Check render targets
-            try:
-                om = pipe.GetOutputMerger()
-                if om:
-                    for i, rt in enumerate(om.renderTargets):
-                        if rt.resourceId != rd.ResourceId.Null():
-                            res_name = ""
-                            try:
-                                res_name = ctx.GetResourceName(rt.resourceId)
-                            except Exception:
-                                pass
-                            if res_name and texture_name.lower() in res_name.lower():
-                                return "RenderTarget[%d]: '%s'" % (i, res_name)
-            except Exception:
-                pass
+                    action = self.ctx.GetAction(usage.eventId)
+                    if not action:
+                        continue
 
-            return None
+                    if not (action.flags & (rd.ActionFlags.Drawcall | rd.ActionFlags.Dispatch)):
+                        continue
 
-        return self._search_draws(matcher)
+                    usage_reason = self._format_resource_usage(usage, self.ctx)
+                    reason = "%s: %s" % (res_name, usage_reason)
+                    entry = matches_by_event.setdefault(usage.eventId, {
+                        "action": action,
+                        "reasons": [],
+                    })
+                    if reason not in entry["reasons"]:
+                        entry["reasons"].append(reason)
+
+            result["scanned_draws"] = len(matches_by_event)
+            logger.info("Searching %d draw calls (texture usage)..." %
+                        result["scanned_draws"])
+            t_start = time.time()
+
+            for event_id in sorted(matches_by_event.keys()):
+                entry = matches_by_event[event_id]
+                action = entry["action"]
+                result["matches"].append({
+                    "event_id": action.eventId,
+                    "name": action.GetName(structured_file),
+                    "match_reason": "; ".join(entry["reasons"]),
+                })
+
+            logger.info("Search completed in %.2f seconds. Found %d matches out of %d draw calls." % (
+                time.time() -
+                t_start, len(result["matches"]), result["scanned_draws"]
+            ))
+
+        self._invoke(callback)
+        result["total_matches"] = len(result["matches"])
+        return result
 
     def find_draws_by_resource(self, resource_id):
         """Find all draw calls using a specific resource ID (exact match)."""
+        if not self.ctx.IsCaptureLoaded():
+            raise ValueError("No capture loaded")
+
         target_rid = Parsers.parse_resource_id(resource_id)
-        stages_to_check = Helpers.get_all_shader_stages()
 
-        def matcher(pipe, controller, action, ctx):
-            # Check shaders
-            for stage in stages_to_check:
-                shader = pipe.GetShader(stage)
-                if shader == target_rid:
-                    return "%s shader" % str(stage)
+        result = {"matches": [], "scanned_draws": 0}
 
-            # Check SRVs and UAVs
-            for stage in stages_to_check:
-                try:
-                    srvs = pipe.GetReadOnlyResources(stage, False)
-                    for srv in srvs:
-                        if srv.descriptor.resource == target_rid:
-                            return "%s SRV slot %d" % (str(stage), srv.access.index)
-                except Exception:
-                    pass
+        def callback(controller):
+            usage_events = controller.GetUsage(target_rid)
+            structured_file = controller.GetStructuredFile()
+            matches_by_event = {}
 
-                try:
-                    uavs = pipe.GetReadWriteResources(stage, False)
-                    for uav in uavs:
-                        if uav.descriptor.resource == target_rid:
-                            return "%s UAV slot %d" % (str(stage), uav.access.index)
-                except Exception:
-                    pass
+            for usage in usage_events:
+                if usage.eventId == 0:
+                    continue
 
-            # Check render targets
-            try:
-                om = pipe.GetOutputMerger()
-                if om:
-                    for i, rt in enumerate(om.renderTargets):
-                        if rt.resourceId == target_rid:
-                            return "RenderTarget[%d]" % i
-                    if om.depthTarget.resourceId == target_rid:
-                        return "DepthTarget"
-            except Exception:
-                pass
+                action = self.ctx.GetAction(usage.eventId)
+                if not action:
+                    continue
 
-            return None
+                if not (action.flags & (rd.ActionFlags.Drawcall | rd.ActionFlags.Dispatch)):
+                    continue
 
-        return self._search_draws(matcher)
+                reason = self._format_resource_usage(usage, self.ctx)
+                entry = matches_by_event.setdefault(usage.eventId, {
+                    "action": action,
+                    "reasons": [],
+                })
+                if reason not in entry["reasons"]:
+                    entry["reasons"].append(reason)
+
+            result["scanned_draws"] = len(matches_by_event)
+            logger.info("Searching %d draw calls (resource usage)..." %
+                        result["scanned_draws"])
+            t_start = time.time()
+
+            for event_id in sorted(matches_by_event.keys()):
+                entry = matches_by_event[event_id]
+                action = entry["action"]
+                result["matches"].append({
+                    "event_id": action.eventId,
+                    "name": action.GetName(structured_file),
+                    "match_reason": "; ".join(entry["reasons"]),
+                })
+
+            logger.info("Search completed in %.2f seconds. Found %d matches out of %d draw calls." % (
+                time.time() -
+                t_start, len(result["matches"]), result["scanned_draws"]
+            ))
+
+        self._invoke(callback)
+        result["total_matches"] = len(result["matches"])
+        return result

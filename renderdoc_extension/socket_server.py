@@ -8,6 +8,8 @@ import os
 import traceback
 import tempfile
 
+from .utils import logger
+
 from PySide2.QtCore import QObject, QTimer
 
 
@@ -96,6 +98,9 @@ class MCPBridgeServer(QObject):
             try:
                 response = self.handler.handle(request)
             except Exception as e:
+                logger.error(
+                    f"[MCPBridgeServer] Error handling request: {str(e)}")
+                logger.error("traceback:\n" + traceback.format_exc())
                 traceback.print_exc()
                 response = {
                     "id": request.get("id"),
@@ -116,5 +121,7 @@ class MCPBridgeServer(QObject):
                     os.remove(RESPONSE_LOCK_FILE)
 
         except Exception as e:
-            print("[MCP Bridge] Error processing request: %s" % str(e))
+            logger.error(
+                f"[MCPBridgeServer] Error processing request: {str(e)}")
+            logger.error("traceback:\n" + traceback.format_exc())
             traceback.print_exc()

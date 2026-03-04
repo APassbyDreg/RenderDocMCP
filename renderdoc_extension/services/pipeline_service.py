@@ -64,7 +64,8 @@ class PipelineService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["shader"]
 
     def get_pipeline_state(self, event_id):
@@ -163,7 +164,8 @@ class PipelineService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["pipeline"]
 
     def _get_stage_resources(self, controller, pipe, stage, reflection):

@@ -67,7 +67,8 @@ class ResourceService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["data"]
 
     def get_texture_info(self, resource_id):
@@ -104,7 +105,8 @@ class ResourceService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["texture"]
 
     def get_texture_data(self, resource_id, mip=0, slice=0, sample=0, depth_slice=None):
@@ -210,5 +212,6 @@ class ResourceService:
         self._invoke(callback)
 
         if result["error"]:
-            raise ValueError(result["error"])
+            return result
+            # raise ValueError(result["error"])
         return result["data"]

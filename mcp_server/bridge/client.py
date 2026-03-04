@@ -83,10 +83,9 @@ class RenderDocBridge:
                     os.remove(RESPONSE_FILE)
 
                     if "error" in response:
-                        error = response["error"]
-                        raise RenderDocBridgeError(f"[{error['code']}] {error['message']}")
-
-                    return response.get("result")
+                        return response
+                    else:
+                        return response.get("result")
 
                 # Check timeout
                 if time.time() - start_time > self.timeout:
