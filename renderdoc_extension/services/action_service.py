@@ -184,22 +184,22 @@ class ActionService:
                         details["pixel_shader"] = ps_data
 
                 if action.flags & rd.ActionFlags.Dispatch:
-                    details["dispatchDimension"] = action.dispatchDimension
-                    details["dispatchThreadDimension"] = action.dispatchThreadsDimension
+                    details["dispatch_dimension"] = action.dispatchDimension
+                    details["dispatch_thread_dimension"] = action.dispatchThreadsDimension
                     cs_data = self.get_shader_brief(
                         pipeline_state, rd.ShaderStage.Compute)
                     if cs_data:
                         details["compute_shader"] = cs_data
 
                 if action.flags & rd.ActionFlags.Copy:
-                    details["copySource"] = f"resource ID={str(action.copySource)}"
-                    details["copySourceSubresource"] = {
+                    details["copy_source"] = f"resource ID={str(action.copySource)}"
+                    details["copy_source_subresource"] = {
                         "mip": action.copySourceSubresource.mip,
                         "slice": action.copySourceSubresource.slice,
                         "sample": action.copySourceSubresource.sample,
                     }
-                    details["copyDestination"] = f"resource ID={str(action.copyDestination)}"
-                    details["copyDestinationSubresource"] = {
+                    details["copy_destination"] = f"resource ID={str(action.copyDestination)}"
+                    details["copy_destination_subresource"] = {
                         "mip": action.copyDestinationSubresource.mip,
                         "slice": action.copyDestinationSubresource.slice,
                         "sample": action.copyDestinationSubresource.sample,
@@ -364,12 +364,11 @@ class ActionService:
         if refl.debugInfo.sourceDebugInformation:
             return {
                 "resource_id": str(shader),
-                "entrySourceFile": refl.debugInfo.files[0].filename,
-                "entrySourceName": refl.debugInfo.entrySourceName,
+                "entry_source_file": refl.debugInfo.files[0].filename,
+                "entry_source_name": refl.debugInfo.entrySourceName,
             }
         else:
             return {
                 "resource_id": str(shader),
                 "resource_name": self.ctx.GetResourceName(shader) or "",
-                "debugStatus": "No source available, can only use disassembly"
             }

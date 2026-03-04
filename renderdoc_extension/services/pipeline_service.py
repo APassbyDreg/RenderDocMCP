@@ -32,17 +32,13 @@ class PipelineService:
                 result["error"] = "No %s shader bound" % stage
                 return
 
-            entry = pipe.GetShaderEntryPoint(stage_enum)
             reflection = pipe.GetShaderReflection(stage_enum)
 
             if not reflection:
                 result["error"] = "No reflection available for %s shader" % stage
                 return
 
-            shader_info = {
-                "entry_point": entry,
-                "stage": stage,
-            }
+            shader_info = {"stage": stage}
 
             # debug info
             debug_info = reflection.debugInfo
@@ -55,12 +51,23 @@ class PipelineService:
                             ), reflection, targets[0]
                         )
                         shader_info["disassembly"] = disasm
+                        shader_info["entry_point"] = pipe.GetShaderEntryPoint(
+                            stage_enum)
                 except Exception as e:
                     shader_info["disassembly_error"] = str(e)
             else:
-                shader_info["source_files"] = [
-                    file.filename for file in debug_info.files]
-
+                if full:
+                    shader_info["source_files"] = [
+                        {
+                            "filename": file.filename,
+                            "file_contents": file.contents,
+                        }
+                        for file in debug_info.files
+                    ]
+                else:
+                    shader_info["source_files"] = [
+                        file.filename for file in debug_info.files]
+                shader_info["entry_source_name"] = debug_info.entrySourceName
             # constant buffer info
             try:
                 shader_info["constant_buffers"] = [Serializers.serialize_const_block(

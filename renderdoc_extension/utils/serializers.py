@@ -315,8 +315,8 @@ class Serializers:
         is_typed_buffer = acc.type == rd.DescriptorType.TypedBuffer or acc.type == rd.DescriptorType.ReadWriteTypedBuffer
 
         data = {
-            "shaderName":      bind_name,
-            "descriptorType":  str(acc.type),
+            "shader_name":      bind_name,
+            "descriptor_type":  str(acc.type),
             "resource":        str(desc.resource),
         }
 
@@ -324,21 +324,21 @@ class Serializers:
         if not full:
             return data
 
-        data["shaderIndex"] = acc.index
+        data["shader_index"] = acc.index
 
         if is_texture:
             data.update({
-                "firstMip":        desc.firstMip,
-                "numMips":         desc.numMips,
-                "firstSlice":      desc.firstSlice,
-                "numSlices":       desc.numSlices,
-                "textureType":     str(desc.textureType),
+                "first_mip":        desc.firstMip,
+                "num_mips":         desc.numMips,
+                "first_slice":      desc.firstSlice,
+                "num_slices":       desc.numSlices,
+                "texture_type":     str(desc.textureType),
             })
         if is_buffer or is_typed_buffer:
             data.update({
-                "byteOffset":      desc.byteOffset,
-                "byteSize":        desc.byteSize,
-                "elementByteSize": desc.elementByteSize,
+                "byte_offset":      desc.byteOffset,
+                "byte_size":        desc.byteSize,
+                "element_byte_size": desc.elementByteSize,
             })
         if is_typed_buffer or is_texture:
             data["format"] = str(
@@ -359,8 +359,8 @@ class Serializers:
             full: Whether to include full details or just basic info
         """
         result = {
-            "byteSize": cb.byteSize,
-            "bufferBacked": cb.bufferBacked,
+            "byte_size": cb.byteSize,
+            "buffer_backed": cb.bufferBacked,
         }
         if not cb.bufferBacked or not full:
             return result
@@ -371,23 +371,17 @@ class Serializers:
         entry = pipe.GetShaderEntryPoint(stage)
         shader_id = refl.resourceId
 
-        try:
-            shader_vars = controller.GetCBufferVariableContents(
-                pipe.GetGraphicsPipelineObject(),       # pipeline object
-                shader_id,  # shader resource id
-                stage,      # shader stage
-                entry,      # entry point name
-                cb_index,   # constantBlocks index
-                used.descriptor.resource,     # GPU buffer id
-                0,          # byte offset
-                0,          # length（0 = read all）
-            )
-        except Exception as e:
-            logger.error(f"{e}")
-            logger.error(f"{type(e)}")
-            logger.error(
-                f"Shader ID: {shader_id}, Stage: {stage}, Entry: {entry}, CB Index: {cb_index}, Buffer ID: {buf_id}")
-            return result
+        shader_vars = controller.GetCBufferVariableContents(
+            pipe.GetGraphicsPipelineObject(),       # pipeline object
+            shader_id,  # shader resource id
+            stage,      # shader stage
+            entry,      # entry point name
+            cb_index,   # constantBlocks index
+            buf_id,     # GPU buffer id
+            0,          # byte offset
+            0,          # length（0 = read all）
+        )
+
         cb_dict = cbuffer_vars_to_dict(shader_vars)
         result["data"] = cb_dict
         return result
