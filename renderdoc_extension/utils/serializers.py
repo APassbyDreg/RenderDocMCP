@@ -82,6 +82,7 @@ class Serializers:
         event_id_min=None,
         event_id_max=None,
         only_actions=False,
+        only_markers=False,
         flags_filter=None,
         _in_matching_marker=False,
     ):
@@ -97,6 +98,7 @@ class Serializers:
             event_id_min: Only include actions with event_id >= this value
             event_id_max: Only include actions with event_id <= this value
             only_actions: Exclude marker actions (PushMarker/PopMarker/SetMarker)
+            only_markers: Only include marker actions (PushMarker/PopMarker/SetMarker)
             flags_filter: Only include actions with these flags
             _in_matching_marker: Internal flag for marker_filter recursion
         """
@@ -125,7 +127,7 @@ class Serializers:
             # 2. marker_filter check - track if we're inside a matching marker
             in_matching = _in_matching_marker
             if marker_filter:
-                if is_push_marker and marker_filter in name:
+                if (is_push_marker or is_set_marker) and marker_filter in name:
                     in_matching = True
 
             # 3. Determine if action passes event_id range filter
@@ -137,8 +139,8 @@ class Serializers:
                 if event_id_max is not None and action.eventId > event_id_max:
                     in_range = False
 
-            # 4. only_actions check - skip markers but process their children
-            if only_actions and is_marker:
+            # 4. only_markers check - skip non-markers but process their children
+            if only_markers and not is_marker:
                 if include_children and action.children:
                     child_actions = Serializers.serialize_actions(
                         action.children,
@@ -149,22 +151,42 @@ class Serializers:
                         event_id_min=event_id_min,
                         event_id_max=event_id_max,
                         only_actions=only_actions,
+                        only_markers=only_markers,
                         flags_filter=flags_filter,
                         _in_matching_marker=in_matching,
                     )
                     serialized.extend(child_actions)
                 continue
 
-            # 5. flags_filter check - only for non-markers
+            # 5. only_actions check - skip markers but process their children
+            if only_actions and not only_markers and is_marker:
+                if include_children and action.children:
+                    child_actions = Serializers.serialize_actions(
+                        action.children,
+                        structured_file,
+                        include_children,
+                        marker_filter=marker_filter,
+                        exclude_markers=exclude_markers,
+                        event_id_min=event_id_min,
+                        event_id_max=event_id_max,
+                        only_actions=only_actions,
+                        only_markers=only_markers,
+                        flags_filter=flags_filter,
+                        _in_matching_marker=in_matching,
+                    )
+                    serialized.extend(child_actions)
+                continue
+
+            # 6. flags_filter check - only for non-markers
             if flags_filter_set and not is_marker:
                 flag_names = Serializers.serialize_flags(flags)
                 if not any(f in flags_filter_set for f in flag_names):
                     continue
 
-            # 6. Check if this action should be included based on marker_filter
+            # 7. Check if this action should be included based on marker_filter
             passes_marker_filter = not marker_filter or in_matching
 
-            # 7. For markers with children, check if any children pass filters
+            # 8. For markers with children, check if any children pass filters
             children_result = []
             has_passing_children = False
             if include_children and action.children:
@@ -177,6 +199,7 @@ class Serializers:
                     event_id_min=event_id_min,
                     event_id_max=event_id_max,
                     only_actions=only_actions,
+                    only_markers=only_markers,
                     flags_filter=flags_filter,
                     _in_matching_marker=in_matching,
                 )
@@ -188,21 +211,26 @@ class Serializers:
             should_include = False
             if is_marker:
                 # Include marker if it has children that pass filters
-                should_include = has_passing_children and passes_marker_filter
+                should_include = has_passing_children or passes_marker_filter
             else:
                 # Include leaf action if it passes all filters
                 should_include = in_range and passes_marker_filter
 
-            if should_include:
+            if should_include and not is_pop_marker:
                 flag_names = Serializers.serialize_flags(flags)
                 item = {
                     "event_id": action.eventId,
                     "action_id": action.actionId,
                     "name": name,
                     "flags": flag_names,
-                    "num_indices": action.numIndices,
-                    "num_instances": action.numInstances,
                 }
+                is_draw = flags & rd.ActionFlags.Drawcall
+                is_dispatch = flags & rd.ActionFlags.Dispatch
+                if is_draw:
+                    item["num_indices"] = action.numIndices
+                    item["num_instances"] = action.numInstances
+                if is_dispatch:
+                    item["dispatch_dimension"] = action.dispatchDimension
                 if children_result:
                     item["children"] = children_result
                 serialized.append(item)

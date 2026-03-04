@@ -22,6 +22,7 @@ class ActionService:
         event_id_min=None,
         event_id_max=None,
         only_actions=False,
+        only_markers=False,
         flags_filter=None,
     ):
         """
@@ -44,6 +45,7 @@ class ActionService:
                 event_id_min=event_id_min,
                 event_id_max=event_id_max,
                 only_actions=only_actions,
+                only_markers=only_markers,
                 flags_filter=flags_filter,
             )
 

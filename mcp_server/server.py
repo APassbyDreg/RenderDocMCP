@@ -36,6 +36,7 @@ def get_draw_calls(
     event_id_min: int | None = None,
     event_id_max: int | None = None,
     only_actions: bool = False,
+    only_markers: bool = False,
     flags_filter: list[str] | None = None,
 ) -> dict:
     """
@@ -48,6 +49,7 @@ def get_draw_calls(
         event_id_min: Only include actions with event_id >= this value
         event_id_max: Only include actions with event_id <= this value
         only_actions: If True, exclude marker actions (PushMarker/PopMarker/SetMarker)
+        only_markers: If True, only include marker actions (PushMarker/PopMarker/SetMarker)
         flags_filter: Only include actions with these flags (list of flag names, e.g. ["Drawcall", "Dispatch"])
 
     Returns a hierarchical tree of actions including markers, draw calls,
@@ -64,6 +66,8 @@ def get_draw_calls(
         params["event_id_max"] = event_id_max
     if only_actions:
         params["only_actions"] = only_actions
+    if only_markers:
+        params["only_markers"] = only_markers
     if flags_filter is not None:
         params["flags_filter"] = flags_filter
     return bridge.call("get_draw_calls", params)

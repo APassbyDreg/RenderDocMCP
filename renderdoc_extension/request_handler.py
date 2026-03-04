@@ -71,7 +71,11 @@ class RequestHandler:
         event_id_min = params.get("event_id_min")
         event_id_max = params.get("event_id_max")
         only_actions = params.get("only_actions", False)
+        only_markers = params.get("only_markers", False)
         flags_filter = params.get("flags_filter")
+        if only_actions and only_markers:
+            raise ValueError(
+                "only_actions and only_markers cannot both be true")
         return self.facade.get_draw_calls(
             include_children=include_children,
             marker_filter=marker_filter,
@@ -79,6 +83,7 @@ class RequestHandler:
             event_id_min=event_id_min,
             event_id_max=event_id_max,
             only_actions=only_actions,
+            only_markers=only_markers,
             flags_filter=flags_filter,
         )
 

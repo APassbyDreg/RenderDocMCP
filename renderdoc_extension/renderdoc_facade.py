@@ -69,6 +69,7 @@ class RenderDocFacade:
         event_id_min=None,
         event_id_max=None,
         only_actions=False,
+        only_markers=False,
         flags_filter=None,
     ):
         """Get all draw calls/actions in the capture with optional filtering"""
@@ -79,6 +80,7 @@ class RenderDocFacade:
             event_id_min=event_id_min,
             event_id_max=event_id_max,
             only_actions=only_actions,
+            only_markers=only_markers,
             flags_filter=flags_filter,
         )
 
