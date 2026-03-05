@@ -172,6 +172,78 @@ class Serializers:
                     return False
             return True
 
+        def compress_serialized(items):
+            compressed = []
+
+            ignored_keys = {
+                "event_id",
+                "action_id",
+                "event_id_range",
+                "action_id_range"
+            }
+
+            def get_range_value(it, id_key, range_key):
+                if range_key in it:
+                    return it[range_key][0], it[range_key][1]
+                if id_key in it:
+                    return it[id_key], it[id_key]
+                return None, None
+
+            def init_range(it, id_key, range_key):
+                if range_key not in it and id_key in it:
+                    it[range_key] = [it[id_key], it[id_key]]
+
+            def deep_equal(lhs, rhs):
+                if type(lhs) is not type(rhs):
+                    return False
+                if isinstance(lhs, dict):
+                    if lhs.keys() != rhs.keys():
+                        return False
+                    return all(deep_equal(lhs[key], rhs[key]) for key in lhs if key not in ignored_keys)
+                if isinstance(lhs, list):
+                    if len(lhs) != len(rhs):
+                        return False
+                    return all(deep_equal(a, b) for a, b in zip(lhs, rhs))
+                return lhs == rhs
+
+            for item in items:
+                if "children" in item:
+                    item["children"] = compress_serialized(item["children"])
+
+                if not compressed:
+                    compressed.append(item)
+                    continue
+
+                prev = compressed[-1]
+
+                if deep_equal(prev, item):
+                    prev_event_start, prev_event_end = get_range_value(
+                        prev, "event_id", "event_id_range")
+                    prev_action_start, prev_action_end = get_range_value(
+                        prev, "action_id", "action_id_range")
+                    item_event_start, item_event_end = get_range_value(
+                        item, "event_id", "event_id_range")
+                    item_action_start, item_action_end = get_range_value(
+                        item, "action_id", "action_id_range")
+
+                    if prev_event_start is not None and item_event_end is not None:
+                        init_range(
+                            prev, "event_id", "event_id_range")
+                        prev["event_id_range"][1] = item_event_end
+                    if prev_action_start is not None and item_action_end is not None:
+                        init_range(
+                            prev, "action_id", "action_id_range")
+                        prev["action_id_range"][1] = item_action_end
+                else:
+                    compressed.append(item)
+
+            for node in compressed:
+                if "action_id_range" in node:
+                    node.pop("action_id", None)
+                if "event_id_range" in node:
+                    node.pop("event_id", None)
+            return compressed
+
         for action in actions:
             name = action.GetName(structured_file)
             flags = action.flags
@@ -298,7 +370,7 @@ class Serializers:
                     item["children"] = children_result
                 serialized.append(item)
 
-        return serialized
+        return compress_serialized(serialized)
 
     @staticmethod
     def serialize_descriptor(used, refl, full=False):
