@@ -36,7 +36,7 @@ class ResourceService:
         def callback(controller):
             # Parse resource ID
             try:
-                rid = Parsers.parse_resource_id(resource_id)
+                rid = Parsers.parse_resource_id(resource_id, self.ctx)
             except Exception:
                 result["error"] = "Invalid resource ID: %s" % resource_id
                 return

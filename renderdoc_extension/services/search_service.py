@@ -205,7 +205,7 @@ class SearchService:
         if not self.ctx.IsCaptureLoaded():
             raise ValueError("No capture loaded")
 
-        target_rid = Parsers.parse_resource_id(resource_id)
+        target_rid = Parsers.parse_resource_id(resource_id, self.ctx)
 
         result = {"matches": [], "scanned_draws": 0}
 
@@ -214,6 +214,8 @@ class SearchService:
             structured_file = controller.GetStructuredFile()
             matches_by_event = {}
 
+            logger.info("Found %d usage events for resource %s. Filtering draw calls..." %
+                        (len(usage_events), target_rid))
             for usage in usage_events:
                 if usage.eventId == 0:
                     continue

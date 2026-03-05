@@ -3,6 +3,7 @@ Parse utility functions for RenderDoc data types.
 """
 
 import renderdoc as rd
+from . import logger
 
 
 class Parsers:
@@ -25,16 +26,18 @@ class Parsers:
         return stage_map[stage_lower]
 
     @staticmethod
-    def parse_resource_id(resource_id_str):
+    def parse_resource_id(resource_id_str, ctx):
         """Parse resource ID string to ResourceId object"""
         # Handle formats like "ResourceId::123" or just "123"
-        rid = rd.ResourceId()
         if "::" in resource_id_str:
             id_part = resource_id_str.split("::")[-1]
         else:
             id_part = resource_id_str
-        rid.id = int(id_part)
-        return rid
+        target_id = int(id_part)
+        for res in ctx.GetResources():
+            if int(res.resourceId) == target_id:
+                return res.resourceId
+        return rd.ResourceId.Null()
 
     @staticmethod
     def extract_numeric_id(resource_id_str):
