@@ -46,12 +46,12 @@ RenderDocMCP/
 | `get_capture_status` | Check capture load status |
 | `get_draw_calls` | Get draw call list (hierarchical structure, filtering supported) |
 | `get_frame_summary` | Get frame-wide statistics (draw call count, marker list, etc.) |
-| `find_draws_by_shader` | Reverse search draw calls by shader name |
+<!-- | `find_draws_by_shader` | Reverse search draw calls by shader name | -->
 | `find_draws_by_texture` | Reverse search draw calls by texture name |
 | `find_draws_by_resource` | Reverse search draw calls by resource ID |
-| `get_draw_call_details` | Get specific draw call details |
+| `get_action_details` | Get specific draw call details |
 | `get_action_timings` | Get GPU execution time for actions |
-| `get_shader_info` | Get shader source/constant buffers (full mode supported) |
+| `get_shader_details` | Get shader source/constant buffers |
 | `get_buffer_contents` | Get buffer data (offset/length can be specified) |
 | `get_texture_info` | Get texture metadata |
 | `get_texture_data` | Get texture pixel data (mip/slice/3D slice supported) |
@@ -87,8 +87,8 @@ open_capture(capture_path="D:\\captures\\game.rdc")
 ### Reverse Search Tools
 
 ```python
-# Search by shader name (partial match)
-find_draws_by_shader(shader_name="Toon", stage="pixel")
+# # Search by shader name (partial match)
+# find_draws_by_shader(shader_name="Toon", stage="pixel")
 
 # Search by texture name (partial match)
 find_draws_by_texture(texture_name="CharacterSkin")

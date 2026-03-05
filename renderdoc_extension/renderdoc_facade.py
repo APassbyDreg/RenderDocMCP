@@ -140,5 +140,5 @@ class RenderDocFacade:
         return self._pipeline.get_shader_details(event_id, stage)
 
     def get_pipeline_state(self, event_id):
-        """Get full pipeline state at an event"""
+        """Get pipeline state (IA, viewport, output merger) at a specific event"""
         return self._pipeline.get_pipeline_state(event_id)

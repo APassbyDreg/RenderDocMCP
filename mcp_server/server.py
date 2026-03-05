@@ -270,19 +270,17 @@ def get_texture_data(
 @mcp.tool
 def get_pipeline_state(event_id: int) -> dict:
     """
-    Get the full graphics pipeline state at a specific event.
+    Get the graphics pipeline state at a specific event.
 
     Args:
         event_id: The event ID to get pipeline state at
 
-    Returns detailed pipeline state including:
-    - Bound shaders with entry points for each stage
-    - Shader resources (SRVs): textures and buffers with dimensions, format, slot, name
-    - UAVs (RWTextures/RWBuffers): resource details with dimensions and format
-    - Samplers: addressing modes, filter settings, LOD parameters
-    - Constant buffers: slot, size, variable count
-    - Render targets and depth target
-    - Viewports and input assembly state
+    Returns pipeline state including:
+    - is_drawcall: Whether the event is a draw call
+    - input_assembly: Topology info
+    - viewports: Viewport list (x, y, width, height, min_depth, max_depth)
+    - render_targets: Bound render target resource IDs
+    - depth_target: Bound depth target resource ID (if any)
     """
     return bridge.call("get_pipeline_state", {"event_id": event_id})
 

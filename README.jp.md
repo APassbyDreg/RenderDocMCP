@@ -87,12 +87,12 @@ uv tool update-shell  # PATHに追加
 |--------|------|
 | `get_capture_status` | キャプチャの読み込み状態を確認 |
 | `get_draw_calls` | ドローコール一覧を階層構造で取得 |
-| `get_draw_call_details` | 特定のドローコールの詳細情報を取得 |
-| `get_shader_info` | シェーダーのソースコード・定数バッファの値を取得 (full モード対応) |
+| `get_action_details` | 特定のドローコールの詳細情報を取得 |
+| `get_shader_details` | シェーダーのソースコード・定数バッファの値を取得 (常に full モード) |
 | `get_buffer_contents` | バッファの内容を取得 (Base64) |
 | `get_texture_info` | テクスチャのメタデータを取得 |
 | `get_texture_data` | テクスチャのピクセルデータを取得 (Base64) |
-| `get_pipeline_state` | パイプライン状態を取得 |
+| `get_pipeline_state` | パイプライン状態を取得（IA、ビューポート、出力マージャー） |
 
 ## 使用例
 
@@ -105,10 +105,7 @@ get_draw_calls(include_children=true)
 ### シェーダー情報の取得
 
 ```
-get_shader_info(event_id=123, stage="pixel", full=false)
-
-# 定数バッファ・リソースバインディングの詳細を含める
-get_shader_info(event_id=123, stage="pixel", full=true)
+get_shader_details(event_id=123, stage="pixel")
 ```
 
 ### パイプライン状態の取得

@@ -163,21 +163,21 @@ class ActionService:
                 details["instance_offset"] = action.instanceOffset
                 details["index_offset"] = action.indexOffset
                 # Output resources
-                outputs = []
-                for i, output in enumerate(action.outputs):
-                    if output != rd.ResourceId.Null():
-                        outputs.append(
-                            {"index": i, "resource_id": str(output)})
+                outputs = [
+                    {"index": i, "resource_id": str(output)}
+                    for i, output in enumerate(action.outputs)
+                    if output != rd.ResourceId.Null()
+                ]
                 if outputs:
                     details["outputs"] = outputs
                 if action.depthOut != rd.ResourceId.Null():
                     details["depth_output"] = str(action.depthOut)
-                # Shaders
-                vs_data = self.get_shader_brief(
+                # Shaders — delegated to PipelineService
+                vs_data = self._get_shader_brief(
                     pipe, controller, rd.ShaderStage.Vertex)
                 if vs_data:
                     details["vertex_shader"] = vs_data
-                ps_data = self.get_shader_brief(
+                ps_data = self._get_shader_brief(
                     pipe, controller, rd.ShaderStage.Pixel)
                 if ps_data:
                     details["pixel_shader"] = ps_data
@@ -186,7 +186,7 @@ class ActionService:
             if is_dispatch:
                 details["dispatch_dimension"] = action.dispatchDimension
                 details["dispatch_thread_dimension"] = action.dispatchThreadsDimension
-                cs_data = self.get_shader_brief(
+                cs_data = self._get_shader_brief(
                     pipe, controller, rd.ShaderStage.Compute)
                 if cs_data:
                     details["compute_shader"] = cs_data
@@ -212,7 +212,6 @@ class ActionService:
 
         if result["error"]:
             return result
-            # raise ValueError(result["error"])
         return result["details"]
 
     def get_action_timings(
@@ -351,32 +350,19 @@ class ActionService:
 
         if result["error"]:
             return result
-            # raise ValueError(result["error"])
         return result["data"]
 
-    def get_shader_brief(self, pipe, controller, stage):
-        reflection = pipe.GetShaderReflection(stage)
+    def _get_shader_brief(self, pipe, controller, stage_enum):
+        """
+        Return a brief shader info dict for the given stage.
+        Calls Serializers.serialize_stage_shader_info with full=False.
+        Must be called from within an existing replay-thread callback.
+        """
+        reflection = pipe.GetShaderReflection(stage_enum)
         if reflection is None:
-            return "reflection unavailable for stage %s" % str(stage)
+            return {"error": "reflection unavailable for stage %s" % str(stage_enum)}
 
-        data = None
-        if reflection.debugInfo.sourceDebugInformation:
-            data = {
-                "entry_source_file": reflection.debugInfo.files[0].filename,
-                "entry_source_name": reflection.debugInfo.entrySourceName,
-            }
-        else:
-            data = {
-                "resource_name": self.ctx.GetResourceName(reflection.resourceId) or "N/A",
-            }
-
-        data["constant_buffers"] = [
-            Serializers.serialize_const_block(
-                pipe, stage, reflection, controller, i, cb, False)
-            for i, cb in enumerate(reflection.constantBlocks)]
-        data["srv"] = [Serializers.serialize_descriptor(res, reflection, False)
-                       for res in pipe.GetReadOnlyResources(stage, True)]
-        data["uav"] = [Serializers.serialize_descriptor(res, reflection, False)
-                       for res in pipe.GetReadWriteResources(stage, True)]
-
-        return data
+        return Serializers.serialize_stage_shader_info(
+            pipe, controller, stage_enum, str(stage_enum), reflection,
+            full=False, ctx=self.ctx
+        )

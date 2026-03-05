@@ -359,6 +359,156 @@ class Serializers:
         return data
 
     @staticmethod
+    def serialize_stage_shader_info(pipe, controller, stage_enum, stage_str, reflection, full, ctx=None):
+        """
+        Build a dict with shader info (source/disasm, CBs, SRVs, UAVs) for one pipeline stage.
+
+        Shared utility used by PipelineService and ActionService to avoid cross-service coupling.
+
+        Args:
+            pipe:        Pipeline state object
+            controller:  ReplayController (must be called from within a replay-thread callback)
+            stage_enum:  rd.ShaderStage enum value
+            stage_str:   Human-readable stage name (used as "stage" key in the result)
+            reflection:  ShaderReflection object (may be None)
+            full:        True → include full disassembly / CB variable values;
+                         False → brief summary only
+            ctx:         CaptureContext (optional, used to resolve resource names in brief mode)
+        """
+        info = {"stage": stage_str}
+
+        if reflection is not None:
+            debug_info = reflection.debugInfo
+            if not debug_info.sourceDebugInformation or len(debug_info.files) == 0:
+                # No source — emit disassembly (full mode) or entry-point name (brief mode)
+                if full:
+                    try:
+                        targets = controller.GetDisassemblyTargets(True)
+                        if targets:
+                            disasm = controller.DisassembleShader(
+                                pipe.GetGraphicsPipelineObject(
+                                ), reflection, targets[0]
+                            )
+                            info["disassembly"] = disasm
+                            info["entry_point"] = pipe.GetShaderEntryPoint(
+                                stage_enum)
+                    except Exception as e:
+                        info["disassembly_error"] = str(e)
+                else:
+                    # Brief: just a human-readable resource name
+                    resource_name = ""
+                    if ctx is not None:
+                        try:
+                            resource_name = ctx.GetResourceName(
+                                reflection.resourceId) or ""
+                        except Exception:
+                            pass
+                    info["resource_name"] = resource_name or "N/A"
+            else:
+                if full:
+                    info["source_files"] = [
+                        {"filename": f.filename, "file_contents": f.contents}
+                        for f in debug_info.files
+                    ]
+                else:
+                    info["entry_source_file"] = debug_info.files[0].filename
+                info["entry_source_name"] = debug_info.entrySourceName
+
+        # Constant buffers
+        try:
+            if reflection and reflection.constantBlocks:
+                info["constant_buffers"] = [
+                    Serializers.serialize_const_block(
+                        pipe, stage_enum, reflection, controller, i, cb, full
+                    )
+                    for i, cb in enumerate(reflection.constantBlocks)
+                ]
+            else:
+                info["constant_buffers"] = []
+        except Exception as e:
+            logger.error(f"Error getting constant buffers: {e}")
+            info["constant_buffers"] = []
+
+        # SRVs and UAVs — only bound descriptors (bound=True)
+        try:
+            info["srv"] = [
+                Serializers.serialize_descriptor(res, reflection, full)
+                for res in pipe.GetReadOnlyResources(stage_enum, True)
+            ]
+            info["uav"] = [
+                Serializers.serialize_descriptor(res, reflection, full)
+                for res in pipe.GetReadWriteResources(stage_enum, True)
+            ]
+        except Exception as e:
+            logger.error(f"Error getting resources: {e}")
+
+        return info
+
+    @staticmethod
+    def serialize_stage_samplers(pipe, stage_enum, reflection):
+        """
+        Serialize sampler bindings for a pipeline stage.
+
+        Args:
+            pipe:        Pipeline state object
+            stage_enum:  rd.ShaderStage enum value
+            reflection:  ShaderReflection object (may be None)
+        """
+        samplers = []
+        try:
+            name_map = {}
+            if reflection:
+                for samp in reflection.samplers:
+                    name_map[samp.fixedBindNumber] = samp.name
+
+            for samp in pipe.GetSamplers(stage_enum, False):
+                slot = samp.access.index
+                samp_info = {"slot": slot, "name": name_map.get(slot, "")}
+                desc = samp.descriptor
+
+                for attr, key in [
+                    ("addressU", "address_u"),
+                    ("addressV", "address_v"),
+                    ("addressW", "address_w"),
+                ]:
+                    try:
+                        samp_info[key] = str(getattr(desc, attr))
+                    except AttributeError:
+                        pass
+
+                try:
+                    samp_info["filter"] = str(desc.filter)
+                except AttributeError:
+                    pass
+
+                for attr, key in [
+                    ("maxAnisotropy", "max_anisotropy"),
+                    ("minLOD", "min_lod"),
+                    ("maxLOD", "max_lod"),
+                    ("mipLODBias", "mip_lod_bias"),
+                ]:
+                    try:
+                        samp_info[key] = getattr(desc, attr)
+                    except AttributeError:
+                        pass
+
+                try:
+                    samp_info["border_color"] = list(desc.borderColor[:4])
+                except (AttributeError, TypeError):
+                    pass
+
+                try:
+                    samp_info["compare_function"] = str(desc.compareFunction)
+                except AttributeError:
+                    pass
+
+                samplers.append(samp_info)
+        except Exception as e:
+            samplers.append({"error": str(e)})
+
+        return samplers
+
+    @staticmethod
     def serialize_const_block(pipe, stage, refl, controller, cb_index, cb, full=False):
         """
         Serialize constant buffer contents to JSON-compatible format

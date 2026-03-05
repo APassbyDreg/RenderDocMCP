@@ -88,15 +88,14 @@ Add to `.mcp.json`:
 | `get_capture_status`     | Check capture load status                                |
 | `get_draw_calls`         | Get draw call list in hierarchical structure             |
 | `get_frame_summary`      | Get frame statistics and top-level markers               |
-| `find_draws_by_shader`   | Find draw calls using specific shader (partial match)    |
 | `find_draws_by_texture`  | Find draw calls using specific texture (partial match)   |
 | `find_draws_by_resource` | Find draw calls using specific resource ID (exact match) |
-| `get_draw_call_details`  | Get detailed information about a specific draw call      |
-| `get_shader_info`        | Get shader source code and constant buffer values (full mode supported) |
+| `get_action_details`     | Get detailed information about a specific action         |
+| `get_shader_details`     | Get shader source code and constant buffer values        |
 | `get_buffer_contents`    | Get buffer contents (Base64)                             |
 | `get_texture_info`       | Get texture metadata                                     |
 | `get_texture_data`       | Get texture pixel data (Base64)                          |
-| `get_pipeline_state`     | Get pipeline state                                       |
+| `get_pipeline_state`     | Get pipeline state (IA, viewport, output merger)         |
 | `list_captures`          | List all .rdc files in directory                         |
 | `open_capture`           | Open a capture file                                      |
 
@@ -111,10 +110,7 @@ get_draw_calls(include_children=true)
 ### Get Shader Information
 
 ```
-get_shader_info(event_id=123, stage="pixel", full=false)
-
-# Include full constant buffers and resource bindings
-get_shader_info(event_id=123, stage="pixel", full=true)
+get_shader_details(event_id=123, stage="pixel")
 ```
 
 ### Get Pipeline State
