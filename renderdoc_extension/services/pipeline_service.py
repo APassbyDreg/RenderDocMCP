@@ -67,53 +67,88 @@ class PipelineService:
             pipe = controller.GetPipelineState()
             api = controller.GetAPIProperties().pipelineType
 
-            pipeline_info = {
-                "event_id": event_id,
-                "api": str(api),
-                "is_drawcall": is_drawcall,
-            }
+            pipeline_info = {}
 
             # Input assembly
             try:
-                ia = pipe.GetIAState()
-                if ia:
-                    pipeline_info["input_assembly"] = {
-                        "topology": str(ia.topology)}
-            except Exception:
-                pass
-
-            # Viewport and scissor
-            try:
-                vp_scissor = pipe.GetViewportScissor()
-                if vp_scissor:
-                    pipeline_info["viewports"] = [
+                topology = pipe.GetPrimitiveTopology()
+                pipeline_info["input_assembly"] = {
+                    "topology": str(topology),
+                }
+                # Index buffer
+                ibuf = pipe.GetIBuffer()
+                if ibuf.resourceId != rd.ResourceId.Null():
+                    pipeline_info["input_assembly"]["index_buffer"] = {
+                        "resource_id": str(ibuf.resourceId),
+                        "byte_offset": ibuf.byteOffset,
+                        "byte_stride": ibuf.byteStride,
+                    }
+                # Vertex buffers
+                vbufs = pipe.GetVBuffers()
+                if vbufs:
+                    pipeline_info["input_assembly"]["vertex_buffers"] = [
                         {
-                            "x": v.x,
-                            "y": v.y,
-                            "width": v.width,
-                            "height": v.height,
-                            "min_depth": v.minDepth,
-                            "max_depth": v.maxDepth,
+                            "resource_id": str(vb.resourceId),
+                            "byte_offset": vb.byteOffset,
+                            "byte_stride": vb.byteStride,
                         }
-                        for v in vp_scissor.viewports
+                        for vb in vbufs
+                        if vb.resourceId != rd.ResourceId.Null()
                     ]
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "Failed to get input assembly state for event %d: %s", event_id, e)
 
-            # Output merger (render targets + depth)
+            # Viewports and scissors
             try:
-                om = pipe.GetOutputMerger()
-                if om:
-                    rts = [
-                        {"index": i, "resource_id": str(rt.resourceId)}
-                        for i, rt in enumerate(om.renderTargets)
-                        if rt.resourceId != rd.ResourceId.Null()
-                    ]
-                    pipeline_info["render_targets"] = rts
-                    if om.depthTarget.resourceId != rd.ResourceId.Null():
-                        pipeline_info["depth_target"] = str(om.depthTarget.resourceId)
-            except Exception:
-                pass
+                viewports = []
+                for i in range(16):
+                    vp = pipe.GetViewport(i)
+                    if not vp.enabled or (vp.width == 0 and vp.height == 0):
+                        break
+                    viewports.append({
+                        "x": vp.x,
+                        "y": vp.y,
+                        "width": vp.width,
+                        "height": vp.height,
+                        "min_depth": vp.minDepth,
+                        "max_depth": vp.maxDepth,
+                    })
+                if viewports:
+                    pipeline_info["viewports"] = viewports
+                scissors = []
+                for i in range(16):
+                    sc = pipe.GetScissor(i)
+                    if not sc.enabled or (sc.width == 0 and sc.height == 0):
+                        break
+                    scissors.append({
+                        "x": sc.x,
+                        "y": sc.y,
+                        "width": sc.width,
+                        "height": sc.height,
+                    })
+                if scissors:
+                    pipeline_info["scissors"] = scissors
+            except Exception as e:
+                logger.error(
+                    "Failed to get viewport/scissor state for event %d: %s", event_id, e)
+
+            # Output targets (render targets + depth)
+            try:
+                output_targets = pipe.GetOutputTargets()
+                rts = [
+                    {"resource_id": str(rt.resource)}
+                    for rt in output_targets
+                    if rt.resource != rd.ResourceId.Null()
+                ]
+                pipeline_info["render_targets"] = rts
+
+                depth = pipe.GetDepthTarget()
+                if depth.resource != rd.ResourceId.Null():
+                    pipeline_info["depth_target"] = str(depth.resource)
+            except Exception as e:
+                logger.error(
+                    "Failed to get output targets for event %d: %s", event_id, e)
 
             result["pipeline"] = pipeline_info
 
