@@ -93,9 +93,9 @@ class RenderDocFacade:
         """Get a summary of the current capture frame"""
         return self._action.get_frame_summary()
 
-    def get_draw_call_details(self, event_id):
+    def get_action_details(self, event_id):
         """Get detailed information about a specific draw call"""
-        return self._action.get_draw_call_details(event_id)
+        return self._action.get_action_details(event_id)
 
     def get_action_timings(self, event_ids=None, marker_filter=None, exclude_markers=None):
         """Get GPU timing information for actions"""
@@ -107,9 +107,9 @@ class RenderDocFacade:
 
     # ==================== Search Operations ====================
 
-    def find_draws_by_shader(self, shader_name, stage=None):
-        """Find all draw calls using a shader with the given name (partial match)"""
-        return self._search.find_draws_by_shader(shader_name, stage)
+    # def find_draws_by_shader(self, shader_name, stage=None):
+    #     """Find all draw calls using a shader with the given name (partial match)"""
+    #     return self._search.find_draws_by_shader(shader_name, stage)
 
     def find_draws_by_texture(self, texture_name):
         """Find all draw calls using a texture with the given name (partial match)"""
@@ -135,9 +135,9 @@ class RenderDocFacade:
 
     # ==================== Pipeline Operations ====================
 
-    def get_shader_info(self, event_id, stage, full=False):
+    def get_shader_details(self, event_id, stage):
         """Get shader information for a specific stage"""
-        return self._pipeline.get_shader_info(event_id, stage, full)
+        return self._pipeline.get_shader_details(event_id, stage)
 
     def get_pipeline_state(self, event_id):
         """Get full pipeline state at an event"""

@@ -42,6 +42,7 @@ class RenderDocBridge:
             raise RenderDocBridgeError(
                 f"Cannot connect to RenderDoc MCP Bridge at {self.host}:{self.port}. "
                 "Make sure RenderDoc is running with the MCP Bridge extension loaded."
+                " IPC directory not found: %s" % IPC_DIR
             )
 
         request = {

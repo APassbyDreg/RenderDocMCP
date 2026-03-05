@@ -52,7 +52,7 @@ def shader_var_to_value(var):
 
 def cbuffer_vars_to_dict(shader_vars):
     """List[ShaderVariable] → dict"""
-    return {v.name: shader_var_to_value(v) for v in shader_vars}
+    return {v.name: {"value": shader_var_to_value(v), "type": str(v.type.name)} for v in shader_vars}
 
 
 class Serializers:
@@ -95,7 +95,7 @@ class Serializers:
         for var in variables:
             var_info = {
                 "name": var.name,
-                "type": str(var.type),
+                "type": str(var.type.name),
                 "rows": var.rows,
                 "columns": var.columns,
             }
@@ -159,6 +159,19 @@ class Serializers:
         if flags_filter:
             flags_filter_set = set(flags_filter)
 
+        def is_subsequence_ignore_case(needle, haystack):
+            if not needle:
+                return True
+            needle = needle.casefold()
+            haystack = haystack.casefold()
+            it = iter(haystack)
+            for ch in needle:
+                if ch.isspace():
+                    continue
+                if ch not in it:
+                    return False
+            return True
+
         for action in actions:
             name = action.GetName(structured_file)
             flags = action.flags
@@ -177,7 +190,7 @@ class Serializers:
             # 2. marker_filter check - track if we're inside a matching marker
             in_matching = _in_matching_marker
             if marker_filter:
-                if (is_push_marker or is_set_marker) and marker_filter in name:
+                if (is_push_marker or is_set_marker) and is_subsequence_ignore_case(marker_filter, name):
                     in_matching = True
 
             # 3. Determine if action passes event_id range filter
@@ -267,13 +280,13 @@ class Serializers:
                 should_include = in_range and passes_marker_filter
 
             if should_include and not is_pop_marker:
-                flag_names = Serializers.serialize_flags(flags)
                 item = {
                     "event_id": action.eventId,
                     "action_id": action.actionId,
                     "name": name,
-                    "flags": flag_names,
                 }
+                if not only_markers:
+                    item["flags"] = Serializers.serialize_flags(flags)
                 is_draw = flags & rd.ActionFlags.Drawcall
                 is_dispatch = flags & rd.ActionFlags.Dispatch
                 if is_draw:
@@ -359,17 +372,16 @@ class Serializers:
             full: Whether to include full details or just basic info
         """
         result = {
+            "name": cb.name,
             "byte_size": cb.byteSize,
             "buffer_backed": cb.bufferBacked,
         }
         if not cb.bufferBacked or not full:
             return result
 
-        used = pipe.GetConstantBlock(stage, cb_index, 0)
-        buf_id = used.descriptor.resource
-
         entry = pipe.GetShaderEntryPoint(stage)
         shader_id = refl.resourceId
+        buf_id = cb.descriptor.resource
 
         shader_vars = controller.GetCBufferVariableContents(
             pipe.GetGraphicsPipelineObject(),       # pipeline object

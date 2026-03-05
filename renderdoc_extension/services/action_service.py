@@ -129,7 +129,7 @@ class ActionService:
         self._invoke(callback)
         return result["summary"]
 
-    def get_draw_call_details(self, event_id):
+    def get_action_details(self, event_id):
         """Get detailed information about a specific draw call"""
         if not self.ctx.IsCaptureLoaded():
             raise ValueError("No capture loaded")
@@ -141,7 +141,7 @@ class ActionService:
             controller.SetFrameEvent(event_id, True)
 
             action = self.ctx.GetAction(event_id)
-            pipeline_state = controller.GetPipelineState()
+            pipe = controller.GetPipelineState()
 
             if not action:
                 result["error"] = "No action at event %d" % event_id
@@ -154,58 +154,57 @@ class ActionService:
                 "flags": Serializers.serialize_flags(action.flags),
             }
 
-            try:
+            is_draw = bool(action.flags & rd.ActionFlags.Drawcall)
+            if is_draw:
+                details["num_indices"] = action.numIndices
+                details["num_instances"] = action.numInstances
+                details["base_vertex"] = action.baseVertex
+                details["vertex_offset"] = action.vertexOffset
+                details["instance_offset"] = action.instanceOffset
+                details["index_offset"] = action.indexOffset
+                # Output resources
+                outputs = []
+                for i, output in enumerate(action.outputs):
+                    if output != rd.ResourceId.Null():
+                        outputs.append(
+                            {"index": i, "resource_id": str(output)})
+                if outputs:
+                    details["outputs"] = outputs
+                if action.depthOut != rd.ResourceId.Null():
+                    details["depth_output"] = str(action.depthOut)
+                # Shaders
+                vs_data = self.get_shader_brief(
+                    pipe, controller, rd.ShaderStage.Vertex)
+                if vs_data:
+                    details["vertex_shader"] = vs_data
+                ps_data = self.get_shader_brief(
+                    pipe, controller, rd.ShaderStage.Pixel)
+                if ps_data:
+                    details["pixel_shader"] = ps_data
 
-                if action.flags & rd.ActionFlags.Drawcall:
-                    details["num_indices"] = action.numIndices
-                    details["num_instances"] = action.numInstances
-                    details["base_vertex"] = action.baseVertex
-                    details["vertex_offset"] = action.vertexOffset
-                    details["instance_offset"] = action.instanceOffset
-                    details["index_offset"] = action.indexOffset
-                    # Output resources
-                    outputs = []
-                    for i, output in enumerate(action.outputs):
-                        if output != rd.ResourceId.Null():
-                            outputs.append(
-                                {"index": i, "resource_id": str(output)})
-                    if outputs:
-                        details["outputs"] = outputs
-                    if action.depthOut != rd.ResourceId.Null():
-                        details["depth_output"] = str(action.depthOut)
-                    # Shaders
-                    vs_data = self.get_shader_brief(
-                        pipeline_state, rd.ShaderStage.Vertex)
-                    if vs_data:
-                        details["vertex_shader"] = vs_data
-                    ps_data = self.get_shader_brief(
-                        pipeline_state, rd.ShaderStage.Pixel)
-                    if ps_data:
-                        details["pixel_shader"] = ps_data
+            is_dispatch = bool(action.flags & rd.ActionFlags.Dispatch)
+            if is_dispatch:
+                details["dispatch_dimension"] = action.dispatchDimension
+                details["dispatch_thread_dimension"] = action.dispatchThreadsDimension
+                cs_data = self.get_shader_brief(
+                    pipe, controller, rd.ShaderStage.Compute)
+                if cs_data:
+                    details["compute_shader"] = cs_data
 
-                if action.flags & rd.ActionFlags.Dispatch:
-                    details["dispatch_dimension"] = action.dispatchDimension
-                    details["dispatch_thread_dimension"] = action.dispatchThreadsDimension
-                    cs_data = self.get_shader_brief(
-                        pipeline_state, rd.ShaderStage.Compute)
-                    if cs_data:
-                        details["compute_shader"] = cs_data
-
-                if action.flags & rd.ActionFlags.Copy:
-                    details["copy_source"] = f"resource ID={str(action.copySource)}"
-                    details["copy_source_subresource"] = {
-                        "mip": action.copySourceSubresource.mip,
-                        "slice": action.copySourceSubresource.slice,
-                        "sample": action.copySourceSubresource.sample,
-                    }
-                    details["copy_destination"] = f"resource ID={str(action.copyDestination)}"
-                    details["copy_destination_subresource"] = {
-                        "mip": action.copyDestinationSubresource.mip,
-                        "slice": action.copyDestinationSubresource.slice,
-                        "sample": action.copyDestinationSubresource.sample,
-                    }
-            except Exception as e:
-                logger.error(f"Error getting action details: {e}")
+            is_copy = bool(action.flags & rd.ActionFlags.Copy)
+            if is_copy:
+                details["copy_source"] = f"resource ID={str(action.copySource)}"
+                details["copy_source_subresource"] = {
+                    "mip": action.copySourceSubresource.mip,
+                    "slice": action.copySourceSubresource.slice,
+                    "sample": action.copySourceSubresource.sample,
+                }
+                details["copy_destination"] = f"resource ID={str(action.copyDestination)}"
+                details["copy_destination_subresource"] = {
+                    "mip": action.copyDestinationSubresource.mip,
+                    "slice": action.copyDestinationSubresource.slice,
+                    "sample": action.copyDestinationSubresource.sample,
+                }
 
             result["details"] = details
 
@@ -355,20 +354,29 @@ class ActionService:
             # raise ValueError(result["error"])
         return result["data"]
 
-    def get_shader_brief(self, pipe, stage_enum):
-        shader = pipe.GetShader(stage_enum)
-        refl = pipe.GetShaderReflection(stage_enum)
-        if refl is None:
-            return {}
+    def get_shader_brief(self, pipe, controller, stage):
+        reflection = pipe.GetShaderReflection(stage)
+        if reflection is None:
+            return "reflection unavailable for stage %s" % str(stage)
 
-        if refl.debugInfo.sourceDebugInformation:
-            return {
-                "resource_id": str(shader),
-                "entry_source_file": refl.debugInfo.files[0].filename,
-                "entry_source_name": refl.debugInfo.entrySourceName,
+        data = None
+        if reflection.debugInfo.sourceDebugInformation:
+            data = {
+                "entry_source_file": reflection.debugInfo.files[0].filename,
+                "entry_source_name": reflection.debugInfo.entrySourceName,
             }
         else:
-            return {
-                "resource_id": str(shader),
-                "resource_name": self.ctx.GetResourceName(shader) or "",
+            data = {
+                "resource_name": self.ctx.GetResourceName(reflection.resourceId) or "N/A",
             }
+
+        data["constant_buffers"] = [
+            Serializers.serialize_const_block(
+                pipe, stage, reflection, controller, i, cb, False)
+            for i, cb in enumerate(reflection.constantBlocks)]
+        data["srv"] = [Serializers.serialize_descriptor(res, reflection, False)
+                       for res in pipe.GetReadOnlyResources(stage, True)]
+        data["uav"] = [Serializers.serialize_descriptor(res, reflection, False)
+                       for res in pipe.GetReadWriteResources(stage, True)]
+
+        return data

@@ -17,12 +17,12 @@ class RequestHandler:
             "get_capture_status": self._handle_get_capture_status,
             "get_draw_calls": self._handle_get_draw_calls,
             "get_frame_summary": self._handle_get_frame_summary,
-            "find_draws_by_shader": self._handle_find_draws_by_shader,
+            # "find_draws_by_shader": self._handle_find_draws_by_shader,
             "find_draws_by_texture": self._handle_find_draws_by_texture,
             "find_draws_by_resource": self._handle_find_draws_by_resource,
-            "get_draw_call_details": self._handle_get_draw_call_details,
+            "get_action_details": self._handle_get_action_details,
             "get_action_timings": self._handle_get_action_timings,
-            "get_shader_info": self._handle_get_shader_info,
+            "get_shader_details": self._handle_get_shader_details,
             "get_buffer_contents": self._handle_get_buffer_contents,
             "get_texture_info": self._handle_get_texture_info,
             "get_texture_data": self._handle_get_texture_data,
@@ -98,13 +98,13 @@ class RequestHandler:
         """Handle get_frame_summary request"""
         return self.facade.get_frame_summary()
 
-    def _handle_find_draws_by_shader(self, params):
-        """Handle find_draws_by_shader request"""
-        shader_name = params.get("shader_name")
-        if shader_name is None:
-            raise ValueError("shader_name is required")
-        stage = params.get("stage")
-        return self.facade.find_draws_by_shader(shader_name, stage)
+    # def _handle_find_draws_by_shader(self, params):
+    #     """Handle find_draws_by_shader request"""
+    #     shader_name = params.get("shader_name")
+    #     if shader_name is None:
+    #         raise ValueError("shader_name is required")
+    #     stage = params.get("stage")
+    #     return self.facade.find_draws_by_shader(shader_name, stage)
 
     def _handle_find_draws_by_texture(self, params):
         """Handle find_draws_by_texture request"""
@@ -120,12 +120,12 @@ class RequestHandler:
             raise ValueError("resource_id is required")
         return self.facade.find_draws_by_resource(resource_id)
 
-    def _handle_get_draw_call_details(self, params):
-        """Handle get_draw_call_details request"""
+    def _handle_get_action_details(self, params):
+        """Handle get_action_details request"""
         event_id = params.get("event_id")
         if event_id is None:
             raise ValueError("event_id is required")
-        return self.facade.get_draw_call_details(int(event_id))
+        return self.facade.get_action_details(int(event_id))
 
     def _handle_get_action_timings(self, params):
         """Handle get_action_timings request"""
@@ -138,16 +138,15 @@ class RequestHandler:
             exclude_markers=exclude_markers,
         )
 
-    def _handle_get_shader_info(self, params):
-        """Handle get_shader_info request"""
+    def _handle_get_shader_details(self, params):
+        """Handle get_shader_details request"""
         event_id = params.get("event_id")
         stage = params.get("stage")
-        full = params.get("full", False)
         if event_id is None:
             raise ValueError("event_id is required")
         if stage is None:
             raise ValueError("stage is required")
-        return self.facade.get_shader_info(int(event_id), stage, full)
+        return self.facade.get_shader_details(int(event_id), stage)
 
     def _handle_get_buffer_contents(self, params):
         """Handle get_buffer_contents request"""

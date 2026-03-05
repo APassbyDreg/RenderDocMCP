@@ -48,8 +48,8 @@ def get_draw_calls(
         exclude_markers: Exclude actions under markers containing these strings (list of partial matches)
         event_id_min: Only include actions with event_id >= this value
         event_id_max: Only include actions with event_id <= this value
-        only_actions: If True, exclude marker actions (PushMarker/PopMarker/SetMarker)
-        only_markers: If True, only include marker actions (PushMarker/PopMarker/SetMarker)
+        only_actions: If True, exclude marker actions, default: False
+        only_markers: If True, only include marker actions, default: False
         flags_filter: Only include actions with these flags (list of flag names, e.g. ["Drawcall", "Dispatch"])
 
     Returns a hierarchical tree of actions including markers, draw calls,
@@ -88,24 +88,24 @@ def get_frame_summary() -> dict:
     return bridge.call("get_frame_summary")
 
 
-@mcp.tool
-def find_draws_by_shader(
-    shader_name: str,
-    stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"] | None = None,
-) -> dict:
-    """
-    Find all draw calls using a shader with the given name (partial match).
+# @mcp.tool
+# def find_draws_by_shader(
+#     shader_name: str,
+#     stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"] | None = None,
+# ) -> dict:
+#     """
+#     Find all draw calls using a shader with the given name (partial match).
 
-    Args:
-        shader_name: Partial name to search for in shader names or entry points
-        stage: Optional shader stage to search (if not specified, searches all stages)
+#     Args:
+#         shader_name: Partial name to search for in shader names or entry points
+#         stage: Optional shader stage to search (if not specified, searches all stages)
 
-    Returns a list of matching draw calls with event IDs and match reasons.
-    """
-    params: dict[str, object] = {"shader_name": shader_name}
-    if stage is not None:
-        params["stage"] = stage
-    return bridge.call("find_draws_by_shader", params)
+#     Returns a list of matching draw calls with event IDs and match reasons.
+#     """
+#     params: dict[str, object] = {"shader_name": shader_name}
+#     if stage is not None:
+#         params["stage"] = stage
+#     return bridge.call("find_draws_by_shader", params)
 
 
 @mcp.tool
@@ -137,16 +137,16 @@ def find_draws_by_resource(resource_id: str) -> dict:
 
 
 @mcp.tool
-def get_draw_call_details(event_id: int) -> dict:
+def get_action_details(event_id: int) -> dict:
     """
-    Get detailed information about a specific draw call.
+    Get detailed information about a specific action (draw / dispatch / copy).
 
     Args:
-        event_id: The event ID of the draw call to inspect
+        event_id: The event ID of the action to inspect
 
-    Includes vertex/index counts, resource outputs, and other metadata.
+    Includes name, flags, and other draw / dispatch / copy specific information.
     """
-    return bridge.call("get_draw_call_details", {"event_id": event_id})
+    return bridge.call("get_action_details", {"event_id": event_id})
 
 
 @mcp.tool
@@ -184,10 +184,9 @@ def get_action_timings(
 
 
 @mcp.tool
-def get_shader_info(
+def get_shader_details(
     event_id: int,
     stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"],
-    full: bool = False,
 ) -> dict:
     """
     Get shader information for a specific stage at a given event.
@@ -195,13 +194,12 @@ def get_shader_info(
     Args:
         event_id: The event ID to inspect the shader at
         stage: The shader stage (vertex, hull, domain, geometry, pixel, compute)
-        full: Whether to return full constant buffer and resource binding details
 
     Returns shader disassembly, constant buffer values, and resource bindings.
     """
     return bridge.call(
-        "get_shader_info",
-        {"event_id": event_id, "stage": stage, "full": full},
+        "get_shader_details",
+        {"event_id": event_id, "stage": stage},
     )
 
 

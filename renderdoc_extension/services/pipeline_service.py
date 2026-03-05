@@ -14,12 +14,13 @@ class PipelineService:
         self.ctx = ctx
         self._invoke = invoke_fn
 
-    def get_shader_info(self, event_id, stage, full=False):
+    def get_shader_details(self, event_id, stage):
         """Get shader information for a specific stage"""
         if not self.ctx.IsCaptureLoaded():
             raise ValueError("No capture loaded")
 
         result = {"shader": None, "error": None}
+        full = True
 
         def callback(controller):
             controller.SetFrameEvent(event_id, True)
@@ -56,17 +57,13 @@ class PipelineService:
                 except Exception as e:
                     shader_info["disassembly_error"] = str(e)
             else:
-                if full:
-                    shader_info["source_files"] = [
-                        {
-                            "filename": file.filename,
-                            "file_contents": file.contents,
-                        }
-                        for file in debug_info.files
-                    ]
-                else:
-                    shader_info["source_files"] = [
-                        file.filename for file in debug_info.files]
+                shader_info["source_files"] = [
+                    {
+                        "filename": file.filename,
+                        "file_contents": file.contents,
+                    }
+                    for file in debug_info.files
+                ]
                 shader_info["entry_source_name"] = debug_info.entrySourceName
             # constant buffer info
             try:
@@ -390,36 +387,3 @@ class PipelineService:
                 return details
 
         return details
-
-    def _get_cbuffer_info(self, controller, pipe, reflection, stage):
-        """Get constant buffer information and values"""
-        cbuffers = []
-
-        for i, cb in enumerate(reflection.constantBlocks):
-            cb_info = {
-                "name": cb.name,
-                "slot": i,
-                "size": cb.byteSize,
-                "variables": [],
-            }
-
-            try:
-                bind = pipe.GetConstantBuffer(stage, i, 0)
-                if bind.resourceId != rd.ResourceId.Null():
-                    variables = controller.GetCBufferVariableContents(
-                        pipe.GetGraphicsPipelineObject(),
-                        reflection.resourceId,
-                        stage,
-                        reflection.entryPoint,
-                        i,
-                        bind.resourceId,
-                        bind.byteOffset,
-                        bind.byteSize,
-                    )
-                    cb_info["variables"] = Serializers.serialize_variables(variables)
-            except Exception as e:
-                cb_info["error"] = str(e)
-
-            cbuffers.append(cb_info)
-
-        return cbuffers
