@@ -405,13 +405,7 @@ class Serializers:
                             pass
                     info["resource_name"] = resource_name or "N/A"
             else:
-                if full:
-                    info["source_files"] = [
-                        {"filename": f.filename, "file_contents": f.contents}
-                        for f in debug_info.files
-                    ]
-                else:
-                    info["entry_source_file"] = debug_info.files[0].filename
+                info["source_files"] = [f.filename for f in debug_info.files]
                 info["entry_source_name"] = debug_info.entrySourceName
 
         # Constant buffers
