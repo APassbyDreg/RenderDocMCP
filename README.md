@@ -1,7 +1,5 @@
 # RenderDoc MCP Server
 
-[日本語](README.jp.md) | **[English]**
-
 An MCP server that runs as a RenderDoc UI extension, enabling AI assistants to access RenderDoc capture data and assist with graphics debugging.
 
 ## Architecture
